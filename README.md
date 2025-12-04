@@ -46,6 +46,8 @@ Specify commands available:
 ```bash
 $ npm install -g @anthropic-ai/claude-code
 $ claude
+or
+$ claude --dangerously-skip-permissions
 ```
 
 OR
