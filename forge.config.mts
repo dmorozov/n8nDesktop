@@ -14,16 +14,8 @@ const config: ForgeConfig = {
     appCategoryType: 'public.app-category.developer-tools',
     // Extra resources to include in the package
     extraResource: ['resources'],
-    // Ignore development files
-    ignore: [
-      /^\/\.git/,
-      /^\/\.vscode/,
-      /^\/node_modules\/\.cache/,
-      /^\/specs/,
-      /^\/tests/,
-      /^\/\.env/,
-      /\.map$/,
-    ],
+    // Note: Don't set 'ignore' here - the Vite plugin automatically sets it
+    // to only include the '.vite' folder for optimal package size
     // macOS signing (requires proper certificates in CI)
     osxSign: {},
     // Windows signing (requires proper certificates in CI)

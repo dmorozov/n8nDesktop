@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, execSync, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import path from 'path';
 import fs from 'fs';
@@ -215,7 +215,6 @@ export class N8nManager extends EventEmitter {
     try {
       if (process.platform === 'win32') {
         // On Windows, use taskkill to kill the process tree
-        const { execSync } = require('child_process');
         execSync(`taskkill /pid ${pid} /T /F`, { stdio: 'ignore' });
       } else {
         // On Unix-like systems, kill the process group

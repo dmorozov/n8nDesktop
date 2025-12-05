@@ -1,4 +1,4 @@
-import { app, BrowserWindow, BrowserView, ipcMain, Menu, Tray, nativeImage, session } from 'electron';
+import { app, BrowserWindow, BrowserView, ipcMain, Menu, Tray, nativeImage } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { registerIpcHandlers } from './ipc-handlers';
