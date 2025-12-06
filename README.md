@@ -261,3 +261,168 @@ https://zippystarter.com/tools/shadcn-ui-theme-generator?themeId=teal
 https://zippystarter.com/tools/shadcn-ui-theme-generator?themeId=starbucks
 
 - Disable create new workflow or load workflow (from file or recent) functionality till the n8n server status is active
+
+## Manual environment configuration
+
+### Phase 1. Create a dockerized environment
+
+1 Create a project's folder:
+
+```bash
+mkdir n8n-granite-project
+cd n8n-granite-project
+```
+
+2. Create docker-compose.yml:
+Create a file named docker-compose.yml and paste the following configuration. This defines three services: n8n, ollama, and pdf_receiver
+
+```yaml
+version: '3.8'
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n # Persistent storage for n8n workflows
+      - ./local_files:/files # Mount local directory for PDF access
+    environment:
+      - WEBHOOK_URL=http://localhost:5678/
+      # Allow n8n container to connect to host's localhost (for Windows/Mac users)
+      - NODE_EXTRA_CA_CERTS=/files/ca_cert.pem # Example for advanced CA usage
+
+  ollama:
+    image: ollama/ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+  pdf_receiver:
+    build: . # Build from current directory (where app.py is)
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./local_files:/app/uploads # Shared volume to verify received files
+
+volumes:
+  n8n_data:
+  ollama_data:
+```
+
+3. Create app.py for the PDF Receiver:
+Create a file named app.py in the same directory (n8n-granite-project). This is the Flask server code from the previous instructions, slightly modified to use the mounted volume path.
+
+```python
+from flask import Flask, request, jsonify
+import os
+
+app = Flask(__name__)
+UPLOAD_FOLDER = './uploads' # This maps to ./local_files on the host
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+@app.route('/upload-pdf', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({"status": "error", "message": "No file part in the request"}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"status": "error", "message": "No selected file"}), 400
+
+    if file:
+        filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+        file.save(filepath)
+        print(f"Saved file: {filepath}")
+        return jsonify({"status": "success", "message": f"File {file.filename} received and saved"}), 200
+
+    return jsonify({"status": "error", "message": "Something went wrong"}), 500
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+
+```
+
+4. Create a Dockerfile for the PDF Receiver:
+Create a file named Dockerfile in the same directory. This defines how the Python app container is built.
+
+```dockerfile
+FROM python:3.10-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app.py .
+
+EXPOSE 5000
+
+CMD ["python", "app.py"]
+```
+
+And a requirements.txt file:
+
+```txt
+Flask
+```
+
+5. Start All Services:
+In your terminal within the n8n-granite-project directory, run:
+
+```bash
+docker compose up -d
+```
+
+This command starts n8n, Ollama, and builds/starts your PDF receiver
+
+### Phase 2: Prepare Granite AI Model and Test File
+
+1. Pull the IBM Granite Model:
+Use Docker's command line to execute a command inside the running Ollama container to download the specific Granite model you need (e.g., ibm/granite-3-instruct:v1).
+
+```bash
+docker exec -it ollama ollama pull ibm/granite-3-instruct:v1
+```
+
+2. Add a Test PDF:
+Create a subdirectory named local_files in your n8n-granite-project folder. Place a sample PDF (e.g., test.pdf) inside this new directory. This folder is shared between your host machine, n8n container, and pdf_receiver container.
+
+### Phase 3: Configure n8n Workflow
+
+1. Access n8n: Open your web browser and navigate to http://localhost:5678. Complete the initial setup.
+2. Create the Workflow:
+  1. Manual Trigger: Add this as your first node.
+  2. Read/Write Files Node:
+    - Operation: Read
+    - Path: /files/test.pdf (This path works inside the Docker container due to the volume mapping in the docker-compose.yml file).
+    - Output Format: Binary Data
+  3. HTTP Request Node (Send PDF to Receiver):
+    - Method: POST
+    - URL: http://pdf_receiver:5000/upload-pdf (Use the service name pdf_receiver as the hostname; Docker Compose networking handles this).
+    - Body Content Type: File
+    - File field name: file
+    - File content: Expression {{ $node["Read/Write Files"].binary }}
+  4. HTTP Request Node (Optional: Send PDF text to Granite AI):
+    - First, add an Extract from File (From PDF) node after the Read node to get text data.
+    - Then, add a new HTTP Request node.
+    - Method: POST
+    - URL: http://ollama:11434/api/generate (Use the service name ollama and the port 11434).
+    - Body Content Type: JSON
+    - Body:
+    ```json
+    {
+      "model": "ibm/granite-3-instruct:v1",
+      "prompt": "Summarize the following document content: " + "{{ $node[\"Extract from File (From PDF)\"].json[\"text\"] }}"
+    }
+    ```
+
+### Phase 4: Test the System
+
+1. Run n8n Workflow: Click "Run Workflow" in n8n.
+2. Verify PDF Reception: Check the local_files folder on your host machine for the newly saved test.pdf copy.
+3. Verify AI Output: The n8n HTTP Request node connected to ollama should return the AI-generated summary in its output panel.
