@@ -29,7 +29,7 @@
 
 1. **User-First Simplicity**: No CLI required, automatic user creation/login, standard installers
 2. **Data Portability**: All data in user-selected folder, fully portable between machines
-3. **Bundled Self-Containment**: Node.js + n8n execution via npx, minimal external dependencies
+3. **Bundled Self-Containment**: Node.js + n8n bundled as production dependency, no external dependencies required
 4. **Transparent Server Lifecycle**: Auto-start, tray icon status, graceful shutdown
 5. **Seamless n8n Integration**: Embedded editor via BrowserView with automatic authentication
 
@@ -52,7 +52,7 @@
 | React | 18.3.1 | UI framework |
 | TypeScript | 5.6.0 | Type-safe JavaScript |
 | Vite | 5.4.0 | Build tool & dev server |
-| n8n | (via npx) | Workflow automation engine |
+| n8n | 1.122.5 | Workflow automation engine (bundled) |
 
 ### UI & Styling
 
@@ -219,7 +219,7 @@ n8nDesktop/
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         N8N SERVER (Child Process)                      │
 │                                                                         │
-│  • Spawned via: npx n8n start                                          │
+│  • Spawned via: bundled n8n binary from node_modules                    │
 │  • Port: Configurable (default 5678)                                    │
 │  • Database: SQLite (in user data folder)                              │
 │  • REST API: /rest/* endpoints for internal communication              │
@@ -311,10 +311,11 @@ const env = {
   N8N_HIRING_BANNER_ENABLED: 'false',
 };
 
-// Spawn process with platform-specific options
-spawn('npx', ['n8n', 'start'], {
+// Find bundled n8n binary and spawn process
+const n8nBinary = findN8nBinary(); // Searches node_modules/.bin/n8n
+spawn(n8nBinary, ['start'], {
   env,
-  shell: isWindows,      // Shell only on Windows for npx
+  shell: isWindows,      // Shell only on Windows for path resolution
   windowsHide: true,     // Hide console window on Windows
   detached: !isWindows,  // Process group on Unix for clean shutdown
 });
@@ -1137,7 +1138,8 @@ On Unix systems, the n8n process is spawned with `detached: true` to create a pr
 
 ```typescript
 // Start with process group
-spawn('npx', ['n8n', 'start'], {
+const n8nBinary = findN8nBinary();
+spawn(n8nBinary, ['start'], {
   detached: !isWindows,
 });
 

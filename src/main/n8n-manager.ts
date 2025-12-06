@@ -2,6 +2,7 @@ import { spawn, execSync, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import path from 'path';
 import fs from 'fs';
+import { app } from 'electron';
 import { isPortAvailable } from './utils/port-finder';
 import { ConfigManager } from './config-manager';
 
@@ -21,8 +22,62 @@ export interface N8nStartResult {
 }
 
 const HEALTH_CHECK_INTERVAL = 5000; // 5 seconds
-const STARTUP_TIMEOUT = 60000; // 60 seconds
+const STARTUP_TIMEOUT = 120000; // 2 minutes - bundled n8n should start faster
 const SHUTDOWN_TIMEOUT = 5000; // 5 seconds (per spec)
+
+/**
+ * Find the path to the bundled n8n binary.
+ * In development, it's in node_modules/.bin/
+ * In production (packaged app), it's in resources/app.asar.unpacked/node_modules/.bin/
+ */
+function findN8nBinary(): string {
+  const isPackaged = app.isPackaged;
+
+  // Possible locations for the n8n binary
+  const possiblePaths: string[] = [];
+
+  if (isPackaged) {
+    // In production, check unpacked resources
+    const resourcesPath = process.resourcesPath;
+    possiblePaths.push(
+      path.join(resourcesPath, 'app.asar.unpacked', 'node_modules', '.bin', 'n8n'),
+      path.join(resourcesPath, 'app.asar.unpacked', 'node_modules', 'n8n', 'bin', 'n8n'),
+      path.join(resourcesPath, 'app', 'node_modules', '.bin', 'n8n'),
+      path.join(resourcesPath, 'app', 'node_modules', 'n8n', 'bin', 'n8n'),
+    );
+  } else {
+    // In development, app.getAppPath() returns the project root
+    // Note: In Vite dev mode, this might return .vite/build, so we need to check parent directories too
+    const appPath = app.getAppPath();
+    possiblePaths.push(
+      path.join(appPath, 'node_modules', '.bin', 'n8n'),
+      path.join(appPath, 'node_modules', 'n8n', 'bin', 'n8n'),
+      // Fallback for Vite dev mode where appPath might be .vite/build
+      path.join(appPath, '..', '..', 'node_modules', '.bin', 'n8n'),
+      path.join(appPath, '..', '..', 'node_modules', 'n8n', 'bin', 'n8n'),
+      path.join(appPath, '..', '..', '..', 'node_modules', '.bin', 'n8n'),
+      path.join(appPath, '..', '..', '..', 'node_modules', 'n8n', 'bin', 'n8n'),
+    );
+  }
+
+  // Windows adds .cmd extension for bin scripts
+  if (process.platform === 'win32') {
+    const windowsPaths = possiblePaths.map((p) => p + '.cmd');
+    possiblePaths.unshift(...windowsPaths);
+  }
+
+  // Find the first existing path
+  for (const binPath of possiblePaths) {
+    if (fs.existsSync(binPath)) {
+      console.log('Found n8n binary at:', binPath);
+      return binPath;
+    }
+  }
+
+  // Fallback to npx if bundled binary not found (shouldn't happen in production)
+  console.warn('Bundled n8n binary not found, falling back to npx. Searched:', possiblePaths);
+  return 'npx';
+}
 
 export class N8nManager extends EventEmitter {
   private process: ChildProcess | null = null;
@@ -93,14 +148,21 @@ export class N8nManager extends EventEmitter {
 
     return new Promise((resolve) => {
       try {
+        // Find the bundled n8n binary
+        const n8nBinary = findN8nBinary();
+        const isNpxFallback = n8nBinary === 'npx';
+        const isWindows = process.platform === 'win32';
+
+        this.addLog(`Starting n8n from: ${n8nBinary}`);
+
         // Spawn n8n process
         // On Unix-like systems, use detached: true to create a new process group
         // This allows us to kill the entire process tree with process.kill(-pid, signal)
         // On Windows, we'll use taskkill /T to kill the tree
-        const isWindows = process.platform === 'win32';
-        this.process = spawn('npx', ['n8n', 'start'], {
+        const spawnArgs = isNpxFallback ? ['n8n', 'start'] : ['start'];
+        this.process = spawn(n8nBinary, spawnArgs, {
           env,
-          shell: isWindows, // Only use shell on Windows for npx
+          shell: isWindows, // Use shell on Windows for proper path resolution
           windowsHide: true,
           detached: !isWindows, // Create new process group on Unix for clean shutdown
         });

@@ -251,6 +251,7 @@ Summary
 
 TODO:
 I still see some issues with the n8n server. Please fix them:
+- Make sure that the n8n will have all dependencies pre-installed so will not download them on the first server start.
 - I have closed the application by clicking Exit in the context menu for the tray icon. The application is exist but the n8n server is still up. I can see the process is still listening the port.
 - When create new workflow button pressed it shows error "Request failed with status code 401". That probably means the auto login functionality either doesn't work or we are not properly propagating authentication status when accessing n8n UI. Please do web research to resolve the issue.
 

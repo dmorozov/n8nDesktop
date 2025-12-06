@@ -6,7 +6,11 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: true,
+    asar: {
+      // Unpack n8n and its dependencies so they can be spawned as child processes
+      // The n8n binary needs to be directly executable, not inside an ASAR archive
+      unpack: '**/node_modules/{n8n,n8n-*,@n8n}/**/*',
+    },
     icon: 'resources/icon',
     name: 'n8n AI Runner',
     executableName: 'n8n-desktop',

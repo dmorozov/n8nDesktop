@@ -64,7 +64,7 @@ export function MinimizedSidebar({
 
   return (
     <TooltipProvider delayDuration={300}>
-      <aside className="flex h-full w-16 flex-col border-r border-sidebar-border bg-sidebar-bg">
+      <aside className="flex h-full w-16 flex-col border-r border-sidebar-border bg-sidebar">
         {/* Logo/Brand */}
         <div className="flex items-center justify-center border-b border-sidebar-border py-4">
           <Tooltip>
