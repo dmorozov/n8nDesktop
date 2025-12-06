@@ -50,3 +50,11 @@ Constitution: `.specify/memory/constitution.md`
 
 ## Recent Changes
 - 002-ui-design: Added TypeScript 5.6+, Node.js 20.x LTS + Electron 28+, Preact 10.24+, Vite 5+, TailwindCSS 4+, n8n (bundled)
+
+## Design
+- [Architecture of the application](./design/ARCHITECTURE.md)
+- [Docling N8N communication inside of Electron app](./design/DOCLING_N8N_ELECTRON.md)
+- [Docling integration planning](./design/DOCLING_PLANNING.md)
+- [IPC implementation recommendations](./design/IPC_RECOMMENDATIONS.md)
+- [UI Design mock screens](./design/UI/)
+

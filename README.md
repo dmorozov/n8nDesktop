@@ -436,3 +436,16 @@ Create a subdirectory named local_files in your n8n-granite-project folder. Plac
 
 You are an expert in software architectures on the edge of technologies. Please do research, think, and create a detailed architectural plan.
 We need to run Granite Docling (Granite Docling 258M) for OCR PDF parsing (https://www.ibm.com/granite/docs/models/docling) inside of the Electron application (can be spawned as a process). Plan to use Python (using a virtual environment). List all major features of the Granite Docling, split them into 3 categories, and order them by the level of resources and speed required to execute PDF processing (Table Recognition, Formula/Equation Recognition, Figure & Chart Classification, etc). The existing Electron application has already implemented settings page, define steps to add separate tab for the Docling configuration (need to configure temp folder and level of processing based on the 3 categoried identified). Do reserach on how to better organize passing the pdf files to be processed to the Docling and how to consume them back by the Electron application. One more **IMPORTANT** detail about the Electron application. It is already implemented and running the n8n server. The documents' parsing results will be consumed by n8n workflow.
+
+
+https://github.com/docling-project/docling
+https://docling-project.github.io/docling/getting_started/installation/
+https://docling-project.github.io/docling/
+https://docling-project.github.io/docling/examples/full_page_ocr/
+https://docling-project.github.io/docling/examples/batch_convert/
+
+
+Create a detailed step by step plan of robost and managable integrating Granite Docling (using Python) into to the Electron shell application that is running n8n server inside already. The documents list should be provided by n8n server to the Docling. The Docling should parse the provided docuemnts into Markdown preservice page number and extracted text location in the original documents. It should support: PDF, Excel and Microsoft Word documents. The result parsed Markdown should be passed back to the n8n server workflow for the futher processing. Include details of recommended integration points to build the robust production ready application. The Python inside of the Electron application should use virtual environment and project toml file to manage the dependencies. All dependencies for Granite Docling (binaries, libraries) and Python libraries should be included into the Electron application on compile time to avoid downloading them when the Electron application installed on the client's system. The Electron application should check if the Python runtime is available on the target computer and show error with details on how to install the Python environment on the target computer.
+Add separate table with known issues of such integration and workarounds. Identify critical and recommended parts. Add separate section about how to initialize the Docling pipeline to use EasyOCR parser. Include instructions for batch convertion of multiple documents to speed up the process.
+
+IPC using Local HTTP API FastAPI.
