@@ -262,7 +262,10 @@ npx shadcn@latest add https://zippystarter.com/r/blue.json
 npx shadcn@latest add https://zippystarter.com/r/starbucks.json
 npx shadcn@latest add https://zippystarter.com/r/amber.json
 npx shadcn@latest add https://zippystarter.com/r/pumpkin-spice.json
-npx shadcn@latest add https://zippystarter.com/r/nimble.json
+npx shadcn@latest add https://zippystarter.com/r/nimble.jsonhttps://www.shadcn.io/theme/vercel
+
+more themes:
+https://www.shadcn.io/theme/vercel
 
 - Disable create new workflow or load workflow (from file or recent) functionality till the n8n server status is active
 
@@ -430,3 +433,6 @@ Create a subdirectory named local_files in your n8n-granite-project folder. Plac
 1. Run n8n Workflow: Click "Run Workflow" in n8n.
 2. Verify PDF Reception: Check the local_files folder on your host machine for the newly saved test.pdf copy.
 3. Verify AI Output: The n8n HTTP Request node connected to ollama should return the AI-generated summary in its output panel.
+
+You are an expert in software architectures on the edge of technologies. Please do research, think, and create a detailed architectural plan.
+We need to run Granite Docling (Granite Docling 258M) for OCR PDF parsing (https://www.ibm.com/granite/docs/models/docling) inside of the Electron application (can be spawned as a process). Plan to use Python (using a virtual environment). List all major features of the Granite Docling, split them into 3 categories, and order them by the level of resources and speed required to execute PDF processing (Table Recognition, Formula/Equation Recognition, Figure & Chart Classification, etc). The existing Electron application has already implemented settings page, define steps to add separate tab for the Docling configuration (need to configure temp folder and level of processing based on the 3 categoried identified). Do reserach on how to better organize passing the pdf files to be processed to the Docling and how to consume them back by the Electron application. One more **IMPORTANT** detail about the Electron application. It is already implemented and running the n8n server. The documents' parsing results will be consumed by n8n workflow.
