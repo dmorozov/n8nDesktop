@@ -51,7 +51,7 @@ export function App() {
   if (isLoading) {
     return (
       <ThemeProvider defaultTheme="dark" storageKey="n8n-desktop-theme">
-        <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex h-screen items-center justify-center bg-background text-foreground">
           <div className="text-center">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-primary">
               <span className="text-2xl font-bold text-primary-foreground">n8n</span>

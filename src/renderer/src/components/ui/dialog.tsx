@@ -61,7 +61,7 @@ const DialogContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> 
     <div
       ref={ref}
       className={cn(
-        'relative z-50 grid w-full max-w-lg gap-4 rounded-lg border border-border bg-background p-6 shadow-lg',
+        'relative z-50 grid w-full max-w-lg gap-4 rounded-lg border border-border bg-background text-foreground p-6 shadow-lg',
         className
       )}
       {...props}

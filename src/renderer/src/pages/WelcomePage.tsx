@@ -64,7 +64,7 @@ export function WelcomePage({ onComplete }: WelcomePageProps) {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen items-center justify-center bg-background text-foreground p-4">
       <Card className="w-full max-w-lg">
         <CardHeader className="text-center">
           {/* Logo */}

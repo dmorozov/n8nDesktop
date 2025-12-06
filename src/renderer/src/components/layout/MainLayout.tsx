@@ -257,7 +257,7 @@ export function MainLayout({ children, currentPath, onNavigate, editorVisible = 
   }, [editorVisible]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
       {/* Show minimized sidebar when editor is visible, full sidebar otherwise */}
       {editorVisible ? (
         <MinimizedSidebar
