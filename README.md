@@ -257,9 +257,12 @@ I still see some issues with the n8n server. Please fix them:
 
 - Black text color on dark theme makes button labels unreadable
 
-https://ui.shadcn.com/docs/dark-mode/vite
-https://zippystarter.com/tools/shadcn-ui-theme-generator?themeId=teal
-https://zippystarter.com/tools/shadcn-ui-theme-generator?themeId=starbucks
+Install theme:
+npx shadcn@latest add https://zippystarter.com/r/blue.json
+npx shadcn@latest add https://zippystarter.com/r/starbucks.json
+npx shadcn@latest add https://zippystarter.com/r/amber.json
+npx shadcn@latest add https://zippystarter.com/r/pumpkin-spice.json
+npx shadcn@latest add https://zippystarter.com/r/nimble.json
 
 - Disable create new workflow or load workflow (from file or recent) functionality till the n8n server status is active
 
