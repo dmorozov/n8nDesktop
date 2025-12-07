@@ -9,7 +9,7 @@ import { ServerErrorBanner } from '../features/server/ServerErrorBanner';
 import { DataFolderWarningBanner } from '../features/storage/DataFolderWarningBanner';
 import { ThemeToggle } from '../ui/ThemeToggle';
 import { $n8nStatus, restartN8n } from '@/stores/n8n';
-import { closeEditor } from '@/stores/editor';
+import { closeEditor, openEditor } from '@/stores/editor';
 import type { UpdateInfo, DataFolderStatus } from '../../../../preload/types';
 
 interface MainLayoutProps {
@@ -92,7 +92,7 @@ export function MainLayout({ children, currentPath, onNavigate, editorVisible = 
 
       if (result.success && result.data) {
         // Open the editor with the new workflow
-        await window.electron.editor.open(result.data.id);
+        await openEditor(result.data.id);
         // Add to recent
         await window.electron.workflows.addRecent(result.data.id);
       } else {
@@ -170,7 +170,7 @@ export function MainLayout({ children, currentPath, onNavigate, editorVisible = 
         setImportedWorkflow(null);
 
         // Open the editor with the imported workflow
-        await window.electron.editor.open(result.data.id);
+        await openEditor(result.data.id);
         await window.electron.workflows.addRecent(result.data.id);
       } else {
         await window.electron.dialog.showMessage({
@@ -241,7 +241,7 @@ export function MainLayout({ children, currentPath, onNavigate, editorVisible = 
       });
 
       if (result.success && result.data) {
-        await window.electron.editor.open(result.data.id);
+        await openEditor(result.data.id);
         await window.electron.workflows.addRecent(result.data.id);
       } else {
         console.error('Failed to create workflow from template:', result.error);

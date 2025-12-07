@@ -114,18 +114,18 @@ export function WorkflowCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit?.(workflow)}>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit?.(workflow); }}>
                 Edit
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDuplicate?.(workflow)}>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDuplicate?.(workflow); }}>
                 Duplicate
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onExport?.(workflow)}>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onExport?.(workflow); }}>
                 Export
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => onDelete?.(workflow)}
+                onClick={(e) => { e.stopPropagation(); onDelete?.(workflow); }}
                 className="text-destructive focus:text-destructive"
               >
                 Delete

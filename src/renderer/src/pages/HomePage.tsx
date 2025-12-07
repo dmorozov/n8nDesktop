@@ -12,9 +12,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Toggle } from '@/components/ui/toggle';
-import { WorkflowGrid } from '@/components/features/workflows/WorkflowGrid';
-import { WorkflowListView } from '@/components/features/workflows/WorkflowListView';
-import { WorkflowEmptyState } from '@/components/features/workflows/WorkflowEmptyState';
+import { WorkflowHorizontalList } from '@/components/features/workflows/WorkflowHorizontalList';
+import { CreateWorkflowSection } from '@/components/features/workflows/CreateWorkflowSection';
+import { EmptyWorkflowsState } from '@/components/features/workflows/EmptyWorkflowsState';
 import { DeleteConfirmDialog } from '@/components/features/workflows/DeleteConfirmDialog';
 import { WorkflowCardSkeleton } from '@/components/ui/loading-spinner';
 import {
@@ -35,6 +35,7 @@ import {
   type WorkflowStatusFilter,
 } from '@/stores/workflows';
 import { $n8nReady } from '@/stores/n8n';
+import { openEditor } from '@/stores/editor';
 
 type ViewMode = 'grid' | 'list';
 
@@ -154,7 +155,7 @@ export function HomePage() {
 
   const handleEdit = useCallback(async (workflow: Workflow) => {
     try {
-      await window.electron.editor.open(workflow.id);
+      await openEditor(workflow.id);
       await window.electron.workflows.addRecent(workflow.id);
     } catch (error) {
       console.error('Error opening editor:', error);
@@ -168,7 +169,7 @@ export function HomePage() {
         // Add duplicated workflow to store
         addWorkflow(result.data as Workflow);
         // Open the editor with the duplicated workflow
-        await window.electron.editor.open(result.data.id);
+        await openEditor(result.data.id);
       } else {
         await window.electron.dialog.showMessage({
           type: 'error',
@@ -267,7 +268,7 @@ export function HomePage() {
 
       if (result.success && result.data) {
         addWorkflow(result.data as Workflow);
-        await window.electron.editor.open(result.data.id);
+        await openEditor(result.data.id);
         await window.electron.workflows.addRecent(result.data.id);
       } else {
         // Show error message to user
@@ -308,7 +309,7 @@ export function HomePage() {
 
         if (createResult.success && createResult.data) {
           addWorkflow(createResult.data as Workflow);
-          await window.electron.editor.open(createResult.data.id);
+          await openEditor(createResult.data.id);
         }
       } else {
         await window.electron.dialog.showMessage({
@@ -342,7 +343,7 @@ export function HomePage() {
 
       if (result.success && result.data) {
         addWorkflow(result.data as Workflow);
-        await window.electron.editor.open(result.data.id);
+        await openEditor(result.data.id);
         await window.electron.workflows.addRecent(result.data.id);
       }
     } catch (error) {
@@ -359,125 +360,143 @@ export function HomePage() {
             <h1 className="text-2xl font-semibold text-foreground">Workflows</h1>
           </div>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {[...Array(8)].map((_, i) => (
-            <WorkflowCardSkeleton key={i} />
+        <div className="flex gap-4 overflow-hidden">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="flex-shrink-0 w-[280px]">
+              <WorkflowCardSkeleton />
+            </div>
           ))}
         </div>
       </div>
     );
   }
 
-  // Show empty state if no workflows
+  // Show empty state when there are no workflows
   if (workflows.length === 0) {
     return (
-      <div className="p-6">
-        <WorkflowEmptyState
+      <>
+        <EmptyWorkflowsState
+          onCreateNew={handleCreateNew}
+          onImport={handleImport}
+          onSelectTemplate={handleSelectTemplate}
+        />
+        {/* Delete Confirmation Dialog - keep it mounted for consistency */}
+        <DeleteConfirmDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          workflowName={workflowToDelete?.name || ''}
+          onConfirm={handleConfirmDelete}
+          onCancel={handleCancelDelete}
+          isLoading={isDeleting}
+        />
+      </>
+    );
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Existing Workflows Section */}
+      <div>
+        {/* Header with toolbar */}
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-foreground">Your Workflows</h2>
+            <Badge variant="secondary">{getFilteredCount()}</Badge>
+          </div>
+        </div>
+
+        {/* Toolbar: Search, Filter, View Toggle */}
+        <div className="mb-4 flex flex-wrap items-center gap-4">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search workflows..."
+              value={search}
+              onInput={handleSearchChange}
+              className="pl-9"
+            />
+          </div>
+
+          {/* Status Filter */}
+          <Select value={filter} onValueChange={handleFilterChange}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All ({counts.total})</SelectItem>
+              <SelectItem value="active">Active ({counts.active})</SelectItem>
+              <SelectItem value="inactive">Inactive ({counts.inactive})</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* View Toggle */}
+          <div className="flex items-center rounded-md border border-input">
+            <Toggle
+              pressed={viewMode === 'grid'}
+              onPressedChange={() => setViewMode('grid')}
+              size="sm"
+              className="rounded-r-none border-0"
+              aria-label="Grid view"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Toggle>
+            <Toggle
+              pressed={viewMode === 'list'}
+              onPressedChange={() => setViewMode('list')}
+              size="sm"
+              className="rounded-l-none border-0"
+              aria-label="List view"
+            >
+              <List className="h-4 w-4" />
+            </Toggle>
+          </div>
+        </div>
+
+        {/* Workflow Display - Horizontal scrollable */}
+        {filteredWorkflows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <p className="text-muted-foreground">
+              No workflows match your search or filter criteria.
+            </p>
+            <Button
+              variant="link"
+              onClick={() => {
+                setWorkflowSearch('');
+                setWorkflowFilter('all');
+              }}
+              className="mt-2"
+            >
+              Clear filters
+            </Button>
+          </div>
+        ) : (
+          <WorkflowHorizontalList
+            workflows={filteredWorkflows}
+            runningWorkflowIds={runningWorkflowIds}
+            onRun={handleRun}
+            onEdit={handleEdit}
+            onDuplicate={handleDuplicate}
+            onDelete={handleDelete}
+            onExport={handleExport}
+            viewMode={viewMode}
+          />
+        )}
+      </div>
+
+      {/* Separator */}
+      <div className="border-t border-border" />
+
+      {/* Create New Workflow Section */}
+      <div>
+        <h2 className="mb-4 text-lg font-semibold text-foreground">Create New</h2>
+        <CreateWorkflowSection
           onCreateNew={handleCreateNew}
           onImport={handleImport}
           onSelectTemplate={handleSelectTemplate}
         />
       </div>
-    );
-  }
-
-  return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold text-foreground">Workflows</h1>
-          <Badge variant="secondary">{getFilteredCount()}</Badge>
-        </div>
-      </div>
-
-      {/* Toolbar: Search, Filter, View Toggle */}
-      <div className="mb-6 flex flex-wrap items-center gap-4">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder="Search workflows..."
-            value={search}
-            onInput={handleSearchChange}
-            className="pl-9"
-          />
-        </div>
-
-        {/* Status Filter */}
-        <Select value={filter} onValueChange={handleFilterChange}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All ({counts.total})</SelectItem>
-            <SelectItem value="active">Active ({counts.active})</SelectItem>
-            <SelectItem value="inactive">Inactive ({counts.inactive})</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* View Toggle */}
-        <div className="flex items-center rounded-md border border-input">
-          <Toggle
-            pressed={viewMode === 'grid'}
-            onPressedChange={() => setViewMode('grid')}
-            size="sm"
-            className="rounded-r-none border-0"
-            aria-label="Grid view"
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </Toggle>
-          <Toggle
-            pressed={viewMode === 'list'}
-            onPressedChange={() => setViewMode('list')}
-            size="sm"
-            className="rounded-l-none border-0"
-            aria-label="List view"
-          >
-            <List className="h-4 w-4" />
-          </Toggle>
-        </div>
-      </div>
-
-      {/* Workflow Display */}
-      {filteredWorkflows.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16">
-          <p className="text-muted-foreground">
-            No workflows match your search or filter criteria.
-          </p>
-          <Button
-            variant="link"
-            onClick={() => {
-              setWorkflowSearch('');
-              setWorkflowFilter('all');
-            }}
-            className="mt-2"
-          >
-            Clear filters
-          </Button>
-        </div>
-      ) : viewMode === 'grid' ? (
-        <WorkflowGrid
-          workflows={filteredWorkflows}
-          runningWorkflowIds={runningWorkflowIds}
-          onRun={handleRun}
-          onEdit={handleEdit}
-          onDuplicate={handleDuplicate}
-          onDelete={handleDelete}
-          onExport={handleExport}
-        />
-      ) : (
-        <WorkflowListView
-          workflows={filteredWorkflows}
-          runningWorkflowIds={runningWorkflowIds}
-          onRun={handleRun}
-          onEdit={handleEdit}
-          onDuplicate={handleDuplicate}
-          onDelete={handleDelete}
-          onExport={handleExport}
-        />
-      )}
 
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmDialog

@@ -40,48 +40,78 @@ export function registerStorageHandlers(
 
   /**
    * Check if data folder is accessible
+   * Uses retry logic to handle transient file system issues during startup
    */
   ipcMain.handle('storage:checkDataFolder', async (): Promise<DataFolderStatus> => {
     const dataFolder = configManager.get('dataFolder');
 
     // Check if folder exists
     if (!existsSync(dataFolder)) {
-      return {
-        accessible: false,
-        exists: false,
-        writable: false,
-        errorType: 'not_found',
-        dataFolder,
-      };
-    }
-
-    // Check if folder is writable
-    try {
-      const testFile = path.join(dataFolder, '.write-test-' + Date.now());
-      await fs.writeFile(testFile, 'test');
-      await fs.unlink(testFile);
-      return {
-        accessible: true,
-        exists: true,
-        writable: true,
-        dataFolder,
-      };
-    } catch (error) {
-      const errorCode = (error as NodeJS.ErrnoException).code;
-      let errorType: 'not_writable' | 'permission_denied' = 'not_writable';
-
-      if (errorCode === 'EACCES' || errorCode === 'EPERM') {
-        errorType = 'permission_denied';
+      // Try to create the folder if it doesn't exist
+      try {
+        await fs.mkdir(dataFolder, { recursive: true });
+        console.log('Created data folder:', dataFolder);
+      } catch (createError) {
+        console.error('Failed to create data folder:', createError);
+        return {
+          accessible: false,
+          exists: false,
+          writable: false,
+          errorType: 'not_found',
+          dataFolder,
+        };
       }
-
-      return {
-        accessible: false,
-        exists: true,
-        writable: false,
-        errorType,
-        dataFolder,
-      };
     }
+
+    // Check if folder is writable with retry logic
+    // This helps with transient issues during app startup when folder might be briefly locked
+    const maxRetries = 3;
+    const retryDelay = 500; // ms
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const testFile = path.join(dataFolder, '.write-test-' + Date.now() + '-' + attempt);
+        await fs.writeFile(testFile, 'test');
+        await fs.unlink(testFile);
+        return {
+          accessible: true,
+          exists: true,
+          writable: true,
+          dataFolder,
+        };
+      } catch (error) {
+        const errorCode = (error as NodeJS.ErrnoException).code;
+        console.warn(`Data folder write test attempt ${attempt}/${maxRetries} failed:`, errorCode);
+
+        // If this is not the last attempt and the error might be transient, retry
+        if (attempt < maxRetries && (errorCode === 'EBUSY' || errorCode === 'EAGAIN' || errorCode === 'ENOENT')) {
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          continue;
+        }
+
+        // Permanent error or last attempt failed
+        let errorType: 'not_writable' | 'permission_denied' = 'not_writable';
+        if (errorCode === 'EACCES' || errorCode === 'EPERM') {
+          errorType = 'permission_denied';
+        }
+
+        return {
+          accessible: false,
+          exists: true,
+          writable: false,
+          errorType,
+          dataFolder,
+        };
+      }
+    }
+
+    // Should not reach here, but return success if we do
+    return {
+      accessible: true,
+      exists: true,
+      writable: true,
+      dataFolder,
+    };
   });
 
   /**

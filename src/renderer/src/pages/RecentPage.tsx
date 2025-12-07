@@ -13,6 +13,7 @@ import {
   stopExecution,
   type Workflow,
 } from '@/stores/workflows';
+import { openEditor } from '@/stores/editor';
 
 export function RecentPage() {
   // For now, show all workflows sorted by updatedAt
@@ -81,7 +82,7 @@ export function RecentPage() {
 
   const handleEdit = useCallback(async (workflow: Workflow) => {
     try {
-      await window.electron.editor.open(workflow.id);
+      await openEditor(workflow.id);
       await window.electron.workflows.addRecent(workflow.id);
     } catch (error) {
       console.error('Error opening editor:', error);
@@ -93,7 +94,7 @@ export function RecentPage() {
       const result = await window.electron.workflows.duplicate(workflow.id);
       if (result.success && result.data) {
         addWorkflow(result.data as Workflow);
-        await window.electron.editor.open(result.data.id);
+        await openEditor(result.data.id);
       } else {
         await window.electron.dialog.showMessage({
           type: 'error',

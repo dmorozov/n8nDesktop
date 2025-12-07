@@ -197,13 +197,54 @@ export function registerWorkflowHandlers(
 
   /**
    * Delete a workflow
+   * Note: n8n requires workflows to be deactivated and archived before deletion
    */
   ipcMain.handle('workflows:delete', async (_event, id: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      await axios.delete(`${getBaseUrl()}/workflows/${id}`, getAuthConfig());
+      const baseUrl = getBaseUrl();
+      const config = getAuthConfig();
+
+      // First, get the workflow to check if it's active
+      console.log('Fetching workflow before delete:', id);
+      const getResponse = await axios.get(`${baseUrl}/workflows/${id}`, config);
+      const workflow = getResponse.data;
+
+      // If workflow is active, deactivate it first
+      if (workflow.active) {
+        console.log('Deactivating workflow before delete:', id);
+        await axios.patch(`${baseUrl}/workflows/${id}`, { active: false }, config);
+      }
+
+      // Archive the workflow first (n8n requires this before deletion)
+      console.log('Archiving workflow before delete:', id);
+      try {
+        await axios.post(`${baseUrl}/workflows/${id}/archive`, {}, config);
+      } catch (archiveError) {
+        // If archive endpoint doesn't exist (older n8n version), try direct delete
+        if (axios.isAxiosError(archiveError) && archiveError.response?.status === 404) {
+          console.log('Archive endpoint not found, trying direct delete');
+        } else {
+          throw archiveError;
+        }
+      }
+
+      // Now delete the workflow
+      console.log('Deleting workflow:', id);
+      await axios.delete(`${baseUrl}/workflows/${id}`, config);
       return { success: true };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to delete workflow';
+      let message = 'Failed to delete workflow';
+      if (axios.isAxiosError(error)) {
+        console.error('Delete workflow error details:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          url: error.config?.url,
+        });
+        message = error.response?.data?.message || error.message;
+      } else if (error instanceof Error) {
+        message = error.message;
+      }
       console.error('Error deleting workflow:', message);
       return { success: false, error: message };
     }
