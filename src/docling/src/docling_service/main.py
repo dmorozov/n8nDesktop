@@ -13,53 +13,28 @@ Options:
 """
 
 import argparse
-import logging
 import os
 import signal
 import sys
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-import structlog
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from docling_service.api.middleware import TraceContextMiddleware
 from docling_service.api.routes import router
 from docling_service.core.config import settings
+from docling_service.core.logging import configure_logging, get_logger
 from docling_service.core.queue import job_queue
+from docling_service.core.tempfiles import cleanup_orphaned_temp_files
 
+# Configure structured logging (T067)
+configure_logging()
 
-def _get_log_level_int(level_str: str) -> int:
-    """Convert log level string to integer."""
-    level_map = {
-        "DEBUG": logging.DEBUG,
-        "INFO": logging.INFO,
-        "WARNING": logging.WARNING,
-        "ERROR": logging.ERROR,
-        "CRITICAL": logging.CRITICAL,
-    }
-    return level_map.get(level_str.upper(), logging.INFO)
-
-
-# Configure structlog for JSON output
-structlog.configure(
-    processors=[
-        structlog.contextvars.merge_contextvars,
-        structlog.processors.add_log_level,
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-        structlog.processors.JSONRenderer(),
-    ],
-    wrapper_class=structlog.make_filtering_bound_logger(_get_log_level_int(settings.log_level)),
-    context_class=dict,
-    logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
-    cache_logger_on_first_use=True,
-)
-
-logger = structlog.get_logger(__name__)
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
@@ -73,6 +48,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         processing_tier=settings.processing_tier,
         max_concurrent_jobs=settings.max_concurrent_jobs,
     )
+
+    # Clean up orphaned temp files from previous runs (T085)
+    cleanup_orphaned_temp_files()
 
     # Start job queue workers
     await job_queue.start()
@@ -107,6 +85,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Trace context middleware (T068) - extracts X-Trace-Id or generates UUID
+    app.add_middleware(TraceContextMiddleware)
 
     # Include API routes
     app.include_router(router, prefix="/api/v1")

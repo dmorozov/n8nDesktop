@@ -1,0 +1,665 @@
+{
+  "name": "Docling: Batch Process Documents",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "processing_tier",
+              "value": "standard"
+            }
+          ]
+        },
+        "assignments": {
+          "assignments": [
+            {
+              "id": "docs",
+              "name": "file_paths",
+              "value": "={{ [\"/path/to/document1.pdf\", \"/path/to/document2.pdf\", \"/path/to/document3.pdf\"] }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-batch-config",
+      "name": "Set Batch Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DOCLING_API_URL }}/process/batch",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Trace-Id",
+              "value": "={{ $execution.id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"file_paths\": {{ JSON.stringify($json.file_paths) }},\n  \"options\": {\n    \"processing_tier\": \"{{ $json.processing_tier }}\"\n  }\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "submit-batch",
+      "name": "Submit Batch to Docling",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "docling-auth",
+          "name": "Docling Auth Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "correlation_id",
+              "value": "={{ $json.correlation_id }}"
+            }
+          ]
+        },
+        "assignments": {
+          "assignments": [
+            {
+              "id": "job-ids",
+              "name": "job_ids",
+              "value": "={{ $json.job_ids }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-batch-info",
+      "name": "Extract Batch Info",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "job_ids",
+        "options": {}
+      },
+      "id": "split-jobs",
+      "name": "Split Into Jobs",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "job_id",
+              "value": "={{ $json.job_ids }}"
+            },
+            {
+              "name": "correlation_id",
+              "value": "={{ $('Extract Batch Info').item.json.correlation_id }}"
+            }
+          ],
+          "number": [
+            {
+              "name": "poll_count",
+              "value": 0
+            },
+            {
+              "name": "max_polls",
+              "value": 60
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "prepare-poll",
+      "name": "Prepare for Polling",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "unit": "seconds",
+        "value": 2
+      },
+      "id": "wait",
+      "name": "Wait 2s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.DOCLING_API_URL }}/jobs/{{ $json.job_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "check-status",
+      "name": "Check Job Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "docling-auth",
+          "name": "Docling Auth Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "completed",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-completed",
+      "name": "If Completed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2000, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "failed",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "failed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-failed",
+      "name": "If Failed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2000, 500]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "success"
+            },
+            {
+              "name": "markdown",
+              "value": "={{ $json.result.markdown }}"
+            },
+            {
+              "name": "job_id",
+              "value": "={{ $json.job_id }}"
+            },
+            {
+              "name": "file_path",
+              "value": "={{ $json.file_path }}"
+            }
+          ],
+          "number": [
+            {
+              "name": "page_count",
+              "value": "={{ $json.result.metadata.page_count }}"
+            },
+            {
+              "name": "processing_time_ms",
+              "value": "={{ $json.result.metadata.processing_time_ms }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "success-output",
+      "name": "Success Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2220, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "error"
+            },
+            {
+              "name": "error",
+              "value": "={{ $json.error }}"
+            },
+            {
+              "name": "error_type",
+              "value": "={{ $json.error_type }}"
+            },
+            {
+              "name": "job_id",
+              "value": "={{ $json.job_id }}"
+            },
+            {
+              "name": "file_path",
+              "value": "={{ $json.file_path }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "error-output",
+      "name": "Error Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2220, 500]
+    },
+    {
+      "parameters": {
+        "values": {
+          "number": [
+            {
+              "name": "poll_count",
+              "value": "={{ $json.poll_count + 1 }}"
+            }
+          ]
+        },
+        "options": {
+          "dotNotation": true
+        }
+      },
+      "id": "increment-poll",
+      "name": "Increment Poll",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2000, 700]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "timeout",
+              "leftValue": "={{ $json.poll_count }}",
+              "rightValue": "={{ $json.max_polls }}",
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-timeout",
+      "name": "Check Timeout",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2220, 700]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "status",
+              "value": "error"
+            },
+            {
+              "name": "error",
+              "value": "Processing timeout - exceeded maximum poll attempts"
+            },
+            {
+              "name": "error_type",
+              "value": "timeout"
+            },
+            {
+              "name": "job_id",
+              "value": "={{ $json.job_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "timeout-output",
+      "name": "Timeout Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2440, 800]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "id": "aggregate-results",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [2660, 400]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "batch_status",
+              "value": "completed"
+            }
+          ],
+          "number": [
+            {
+              "name": "total_documents",
+              "value": "={{ $json.data.length }}"
+            },
+            {
+              "name": "successful",
+              "value": "={{ $json.data.filter(d => d.status === 'success').length }}"
+            },
+            {
+              "name": "failed",
+              "value": "={{ $json.data.filter(d => d.status === 'error').length }}"
+            }
+          ]
+        },
+        "assignments": {
+          "assignments": [
+            {
+              "id": "results",
+              "name": "results",
+              "value": "={{ $json.data }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "batch-summary",
+      "name": "Batch Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2880, 400]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Set Batch Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Batch Config": {
+      "main": [
+        [
+          {
+            "node": "Submit Batch to Docling",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit Batch to Docling": {
+      "main": [
+        [
+          {
+            "node": "Extract Batch Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Batch Info": {
+      "main": [
+        [
+          {
+            "node": "Split Into Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Into Jobs": {
+      "main": [
+        [
+          {
+            "node": "Prepare for Polling",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare for Polling": {
+      "main": [
+        [
+          {
+            "node": "Wait 2s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2s": {
+      "main": [
+        [
+          {
+            "node": "Check Job Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Job Status": {
+      "main": [
+        [
+          {
+            "node": "If Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Completed": {
+      "main": [
+        [
+          {
+            "node": "Success Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Failed": {
+      "main": [
+        [
+          {
+            "node": "Error Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Increment Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success Output": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Output": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Increment Poll": {
+      "main": [
+        [
+          {
+            "node": "Check Timeout",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Timeout": {
+      "main": [
+        [
+          {
+            "node": "Wait 2s",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Timeout Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Timeout Output": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Results": {
+      "main": [
+        [
+          {
+            "node": "Batch Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "docling"
+    },
+    {
+      "name": "ocr"
+    },
+    {
+      "name": "batch"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2025-12-06T00:00:00.000Z",
+  "versionId": "1"
+}

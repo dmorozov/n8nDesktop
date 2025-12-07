@@ -12,6 +12,7 @@ import structlog
 
 from docling_service.core.config import calculate_timeout, settings
 from docling_service.core.converter import process_document
+from docling_service.core.tempfiles import cleanup_job_temp_files
 
 logger = structlog.get_logger(__name__)
 
@@ -344,6 +345,9 @@ class JobQueue:
                 memory_end_mb=job.memory_end_mb,
                 memory_delta_mb=job.memory_end_mb - (job.memory_start_mb or 0),
             )
+
+            # Clean up temp files (T084)
+            cleanup_job_temp_files(job.id, job.trace_id)
 
 
 # Global job queue instance

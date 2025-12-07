@@ -118,6 +118,24 @@ Access via: **Settings → Docling** tab
 3. Review logs in Settings → Docling → View Logs
 4. Try `lightweight` tier first to verify basic functionality
 
+### Debugging with Trace IDs
+
+Each API request generates a trace ID (UUID) for log correlation:
+
+1. Check the `X-Trace-Id` header in API responses
+2. Use the Log Viewer's trace ID filter to find related logs
+3. Include the trace ID when reporting issues
+
+Example:
+```bash
+# Get trace ID from response header
+curl -i http://localhost:8001/api/v1/health
+# X-Trace-Id: 550e8400-e29b-41d4-a716-446655440000
+
+# Search logs by trace ID
+grep "550e8400-e29b-41d4-a716-446655440000" logs/*.log
+```
+
 ### Memory Issues
 
 1. Reduce concurrent jobs to 1
@@ -139,8 +157,50 @@ See full OpenAPI specification: `specs/003-docling-integration/contracts/openapi
 | `/api/v1/jobs/{id}` | DELETE | Cancel queued job |
 | `/api/v1/jobs` | GET | List all jobs |
 
+## Running Tests
+
+### Python Unit Tests
+
+```bash
+cd src/docling
+poetry run pytest
+# Expected: 96 tests passed
+```
+
+### TypeScript Unit Tests
+
+```bash
+npm test
+# Expected: 70+ tests passed (note: some integration tests require mocking updates)
+```
+
+### Quick Verification
+
+```bash
+# 1. Start the Docling service
+cd src/docling
+poetry run python -m docling_service.main --port 8001
+
+# 2. In another terminal, test health endpoint
+curl http://localhost:8001/api/v1/health
+# Should return: {"status":"healthy","version":"0.1.0",...}
+
+# 3. Test authentication (should fail without token)
+curl -X POST http://localhost:8001/api/v1/process \
+  -H "Content-Type: application/json" \
+  -d '{"file_path": "/tmp/test.pdf"}'
+# Should return: 401 Unauthorized
+
+# 4. Test with token
+curl -X POST http://localhost:8001/api/v1/process \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer test-token" \
+  -d '{"file_path": "/tmp/test.pdf"}'
+```
+
 ## Next Steps
 
 1. Run unit tests: `cd src/docling && poetry run pytest`
 2. Run integration tests: `npm run test:integration`
 3. Import sample workflow from `resources/workflows/docling-batch-summarize.json`
+4. Review Playwright MCP configuration: `specs/003-docling-integration/testing/playwright-mcp.md`

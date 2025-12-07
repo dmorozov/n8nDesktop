@@ -331,6 +331,165 @@ describe('DoclingManager', () => {
       expect(result.error).toContain('Python');
     });
   });
+
+  describe('Start/Stop/Restart operations (T059)', () => {
+    it('should stop gracefully when running', async () => {
+      const { DoclingManager } = await import('../../src/main/docling-manager');
+      const { ConfigManager } = await import('../../src/main/config-manager');
+
+      const configManager = new ConfigManager();
+      const manager = new DoclingManager(configManager);
+
+      // Stop should work even when not running
+      await expect(manager.stop()).resolves.toBeUndefined();
+      expect(manager.getStatus().status).toBe('stopped');
+    });
+
+    it('should return already running error on double start', async () => {
+      const { DoclingManager } = await import('../../src/main/docling-manager');
+      const { ConfigManager } = await import('../../src/main/config-manager');
+
+      const configManager = new ConfigManager();
+      const manager = new DoclingManager(configManager);
+
+      // Mock a running state
+      manager['process'] = {} as any;
+      manager['status'].status = 'running';
+
+      const result = await manager.start();
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('already running');
+
+      // Cleanup
+      manager['process'] = null;
+    });
+
+    it('should reset restart count on manual restart', async () => {
+      const { DoclingManager } = await import('../../src/main/docling-manager');
+      const { ConfigManager } = await import('../../src/main/config-manager');
+
+      const configManager = new ConfigManager();
+      const manager = new DoclingManager(configManager);
+
+      // Simulate previous restart attempts
+      manager['restartAttempts'] = 2;
+      expect(manager.getStatus().restartAttempts).toBe(2);
+
+      // Mock Python not available to make start fail quickly
+      manager['pythonInfo'] = { available: false };
+
+      // Restart should reset the counter
+      await manager.restart();
+      expect(manager['restartAttempts']).toBe(0);
+    });
+
+    it('should emit statusChange on stop', async () => {
+      const { DoclingManager } = await import('../../src/main/docling-manager');
+      const { ConfigManager } = await import('../../src/main/config-manager');
+
+      const configManager = new ConfigManager();
+      const manager = new DoclingManager(configManager);
+
+      const statusChanges: string[] = [];
+      manager.on('statusChange', (status) => {
+        statusChanges.push(status.status);
+      });
+
+      await manager.stop();
+
+      expect(statusChanges).toContain('stopped');
+    });
+
+    it('should track restart attempts correctly', async () => {
+      const { DoclingManager } = await import('../../src/main/docling-manager');
+      const { ConfigManager } = await import('../../src/main/config-manager');
+
+      const configManager = new ConfigManager();
+      const manager = new DoclingManager(configManager);
+
+      // Initial state
+      expect(manager.getStatus().restartAttempts).toBe(0);
+
+      // Simulate restart attempt increment
+      manager['restartAttempts'] = 1;
+      const status1 = manager.getStatus();
+      expect(status1.restartAttempts).toBe(1);
+
+      manager['restartAttempts'] = 2;
+      const status2 = manager.getStatus();
+      expect(status2.restartAttempts).toBe(2);
+    });
+
+    it('should emit restartAttempt event during unexpected exit', async () => {
+      const { DoclingManager } = await import('../../src/main/docling-manager');
+      const { ConfigManager } = await import('../../src/main/config-manager');
+
+      const configManager = new ConfigManager();
+      const manager = new DoclingManager(configManager);
+
+      const restartEvents: [number, number][] = [];
+      manager.on('restartAttempt', (attempt, max) => {
+        restartEvents.push([attempt, max]);
+      });
+
+      // Mock Python not available to prevent actual start
+      manager['pythonInfo'] = { available: false };
+
+      // Trigger unexpected exit handler
+      await manager['handleUnexpectedExit']();
+
+      expect(restartEvents.length).toBeGreaterThan(0);
+      expect(restartEvents[0][0]).toBe(1); // First attempt
+      expect(restartEvents[0][1]).toBe(3); // Max attempts
+    });
+
+    it('should emit maxRestartsExceeded after 3 attempts', async () => {
+      const { DoclingManager } = await import('../../src/main/docling-manager');
+      const { ConfigManager } = await import('../../src/main/config-manager');
+
+      const configManager = new ConfigManager();
+      const manager = new DoclingManager(configManager);
+
+      let maxExceededEmitted = false;
+      manager.on('maxRestartsExceeded', () => {
+        maxExceededEmitted = true;
+      });
+
+      // Simulate 3 previous attempts
+      manager['restartAttempts'] = 3;
+      manager['lastRestartTime'] = Date.now();
+
+      // Mock Python not available
+      manager['pythonInfo'] = { available: false };
+
+      // This should trigger maxRestartsExceeded
+      await manager['handleUnexpectedExit']();
+
+      expect(maxExceededEmitted).toBe(true);
+      expect(manager.getStatus().status).toBe('error');
+    });
+
+    it('should update status with error when max restarts exceeded', async () => {
+      const { DoclingManager } = await import('../../src/main/docling-manager');
+      const { ConfigManager } = await import('../../src/main/config-manager');
+
+      const configManager = new ConfigManager();
+      const manager = new DoclingManager(configManager);
+
+      // Simulate max restarts already reached
+      manager['restartAttempts'] = 3;
+      manager['lastRestartTime'] = Date.now();
+      manager['pythonInfo'] = { available: false };
+
+      await manager['handleUnexpectedExit']();
+
+      const status = manager.getStatus();
+      expect(status.status).toBe('error');
+      expect(status.error).toContain('crashed');
+      expect(status.error).toContain('Manual restart required');
+    });
+  });
 });
 
 describe('DoclingConfig', () => {

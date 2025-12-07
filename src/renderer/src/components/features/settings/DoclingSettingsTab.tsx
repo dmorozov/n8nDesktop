@@ -19,7 +19,11 @@ import {
   AlertCircle,
   CheckCircle,
   Loader2,
+  X,
+  Clock,
+  File,
 } from 'lucide-react';
+import { DoclingLogViewerDialog } from './DoclingLogViewerDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,6 +42,7 @@ import {
   $doclingConfig,
   $pythonInfo,
   $tempFolderDiskSpace,
+  $doclingJobs,
   startDocling,
   stopDocling,
   restartDocling,
@@ -45,6 +50,8 @@ import {
   checkPython,
   refreshTempFolderDiskSpace,
   selectTempFolder,
+  refreshDoclingJobs,
+  cancelDoclingJob,
   TIER_DESCRIPTIONS,
   TIMEOUT_ACTION_DESCRIPTIONS,
 } from '@/stores/docling';
@@ -65,18 +72,35 @@ export function DoclingSettingsTab({
   const doclingConfig = useStore($doclingConfig);
   const pythonInfo = useStore($pythonInfo);
   const tempFolderDiskSpace = useStore($tempFolderDiskSpace);
+  const doclingJobs = useStore($doclingJobs);
 
   const [isRestarting, setIsRestarting] = useState(false);
   const [pendingConfig, setPendingConfig] = useState<Partial<DoclingConfig>>(
     {}
   );
   const [showAdvancedWarning, setShowAdvancedWarning] = useState(false);
+  const [showLogViewer, setShowLogViewer] = useState(false);
 
-  // Check Python availability and disk space on mount
+  // Check Python availability, disk space, and jobs on mount
   useEffect(() => {
     checkPython();
     refreshTempFolderDiskSpace();
-  }, []);
+    refreshDoclingJobs();
+
+    // Set up polling for job status when service is running
+    let intervalId: NodeJS.Timeout | undefined;
+    if (doclingStatus.status === 'running') {
+      intervalId = setInterval(() => {
+        refreshDoclingJobs();
+      }, 3000); // Poll every 3 seconds
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [doclingStatus.status]);
 
   // Get current config value (pending or saved)
   const getConfigValue = <K extends keyof DoclingConfig>(
@@ -343,6 +367,125 @@ export function DoclingSettingsTab({
         </div>
       </div>
 
+      {/* Job Queue UI (T064, T065) */}
+      {doclingStatus.status === 'running' && (
+        <div
+          className="rounded-lg border p-4"
+          data-testid="docling-job-queue"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Label className="text-base">Processing Queue</Label>
+              {doclingJobs.length > 0 && (
+                <Badge variant="secondary" className="font-normal">
+                  {doclingJobs.filter(j => j.status === 'processing').length} active
+                  {doclingJobs.filter(j => j.status === 'queued').length > 0 && (
+                    <>, {doclingJobs.filter(j => j.status === 'queued').length} pending</>
+                  )}
+                </Badge>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => refreshDoclingJobs()}
+              data-testid="docling-refresh-jobs-button"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {doclingJobs.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No documents currently being processed.
+            </p>
+          ) : (
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {doclingJobs.map((job) => (
+                <div
+                  key={job.jobId}
+                  className="flex items-center gap-3 rounded-md border p-2"
+                  data-testid={`docling-job-${job.jobId}`}
+                >
+                  {/* Job status icon */}
+                  <div className="flex-shrink-0">
+                    {job.status === 'processing' ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    ) : job.status === 'queued' ? (
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                    ) : job.status === 'completed' ? (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    ) : job.status === 'failed' ? (
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                    ) : job.status === 'cancelled' ? (
+                      <X className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <File className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </div>
+
+                  {/* Job info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium truncate">
+                        {job.filePath.split('/').pop() || job.filePath}
+                      </span>
+                      <Badge
+                        variant={
+                          job.status === 'completed' ? 'success' :
+                          job.status === 'failed' ? 'destructive' :
+                          job.status === 'processing' ? 'default' :
+                          'secondary'
+                        }
+                        className="text-xs"
+                      >
+                        {job.status}
+                      </Badge>
+                    </div>
+
+                    {/* Progress bar for processing jobs */}
+                    {job.status === 'processing' && (
+                      <div className="mt-1">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full bg-primary transition-all"
+                            style={{ width: `${job.progress}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {job.progress}% complete
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Error message for failed jobs */}
+                    {job.status === 'failed' && job.error && (
+                      <p className="text-xs text-destructive mt-1 truncate">
+                        {job.error}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Cancel button (T065) */}
+                  {(job.status === 'queued' || job.status === 'processing') && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 flex-shrink-0"
+                      onClick={() => cancelDoclingJob(job.jobId)}
+                      data-testid={`docling-cancel-job-${job.jobId}`}
+                      title="Cancel job"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <Separator />
 
       {/* Processing Tier Selection (T041) */}
@@ -550,12 +693,19 @@ export function DoclingSettingsTab({
         <Button
           variant="outline"
           size="sm"
+          onClick={() => setShowLogViewer(true)}
           disabled={doclingStatus.status !== 'running'}
           data-testid="docling-view-logs-button"
         >
           <FileText className="mr-2 h-4 w-4" />
           View Logs
         </Button>
+
+        {/* Docling Log Viewer Dialog (T083) */}
+        <DoclingLogViewerDialog
+          open={showLogViewer}
+          onOpenChange={setShowLogViewer}
+        />
       </div>
 
       <Separator />
