@@ -34,7 +34,7 @@ const electronAPI: ElectronAPI = {
     },
   },
 
-  // Editor management (BrowserView)
+  // Editor management (WebContentsView)
   editor: {
     open: (workflowId?: string) => ipcRenderer.invoke('editor:open', workflowId),
     close: () => ipcRenderer.invoke('editor:close'),

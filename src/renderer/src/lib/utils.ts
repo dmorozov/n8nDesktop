@@ -11,9 +11,18 @@ export function cn(...inputs: ClassValue[]): string {
 /**
  * Format a date relative to now
  */
-export function formatRelativeTime(date: Date | string): string {
+export function formatRelativeTime(date: Date | string | undefined | null): string {
+  if (!date) {
+    return 'Unknown';
+  }
   const now = new Date();
   const target = typeof date === 'string' ? new Date(date) : date;
+
+  // Handle invalid dates
+  if (isNaN(target.getTime())) {
+    return 'Unknown';
+  }
+
   const diffMs = now.getTime() - target.getTime();
   const diffSeconds = Math.floor(diffMs / 1000);
   const diffMinutes = Math.floor(diffSeconds / 60);

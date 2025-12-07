@@ -1,36 +1,40 @@
 import { atom } from 'nanostores';
 
-// Track whether the n8n editor BrowserView is currently visible
+// Track whether the n8n editor WebContentsView is currently visible
 export const $editorVisible = atom<boolean>(false);
+
+// Flag to track if a local update is in progress (to avoid race conditions)
+let localUpdateInProgress = false;
 
 /**
  * Initialize subscription to editor visibility changes from main process
  */
 export function initEditorVisibilitySubscription(): () => void {
-  console.log('Initializing editor visibility subscription');
-
-  // Get initial visibility state immediately
+  // Get initial visibility state - but only if no local update is in progress
   window.electron.editor.isVisible().then((visible) => {
-    console.log('Initial editor visibility:', visible);
-    $editorVisible.set(visible);
+    if (!localUpdateInProgress) {
+      $editorVisible.set(visible);
+    }
   });
 
   // Subscribe to visibility changes
   const unsubscribe = window.electron.editor.onVisibilityChange((visible) => {
-    console.log('Editor visibility changed:', visible);
     $editorVisible.set(visible);
   });
 
   // Poll for visibility state periodically to handle any missed events
   // This ensures the sidebar is always shown correctly even if an event was missed
   const pollInterval = setInterval(() => {
+    // Skip polling if a local update is in progress
+    if (localUpdateInProgress) {
+      return;
+    }
     window.electron.editor.isVisible().then((visible) => {
       if ($editorVisible.get() !== visible) {
-        console.log('Editor visibility corrected via polling:', visible);
         $editorVisible.set(visible);
       }
     });
-  }, 1000);
+  }, 100);
 
   return () => {
     unsubscribe();
@@ -40,14 +44,28 @@ export function initEditorVisibilitySubscription(): () => void {
 
 /**
  * Open the editor with optional workflow ID
- * This sets the visibility state immediately after the IPC call completes
- * to avoid timing issues with event-based state updates
+ * This sets the visibility state immediately BEFORE the IPC call
+ * to ensure the UI updates without any delay
  */
 export async function openEditor(workflowId?: string): Promise<void> {
-  await window.electron.editor.open(workflowId);
-  // Set visibility immediately - the main process has already shown the BrowserView
-  // by the time the IPC call returns
+  // Set flag to prevent race conditions with async operations
+  localUpdateInProgress = true;
+
+  // Set visibility immediately BEFORE the IPC call to prevent any flash of wrong state
   $editorVisible.set(true);
+
+  try {
+    await window.electron.editor.open(workflowId);
+  } catch (error) {
+    // If the editor fails to open, revert the visibility state
+    $editorVisible.set(false);
+    throw error;
+  } finally {
+    // Clear the flag after a short delay to allow state to propagate
+    setTimeout(() => {
+      localUpdateInProgress = false;
+    }, 500);
+  }
 }
 
 /**

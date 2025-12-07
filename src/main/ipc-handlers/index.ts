@@ -324,7 +324,7 @@ export function registerIpcHandlers(
   // ==================== EDITOR HANDLERS ====================
 
   /**
-   * Open n8n editor in BrowserView
+   * Open n8n editor in WebContentsView
    */
   ipcMain.handle('editor:open', async (_event, workflowId?: string) => {
     await showEditor(workflowId);
@@ -335,6 +335,7 @@ export function registerIpcHandlers(
    * Close n8n editor and return to launcher
    */
   ipcMain.handle('editor:close', () => {
+    console.log('[IPC] editor:close handler called');
     hideEditor();
     return { success: true };
   });

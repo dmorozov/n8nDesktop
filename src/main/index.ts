@@ -1,4 +1,4 @@
-import { app, BrowserWindow, BrowserView, ipcMain, Menu, Tray, nativeImage } from 'electron';
+import { app, BrowserWindow, WebContentsView, ipcMain, Menu, Tray, nativeImage, type NativeImage } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { registerIpcHandlers } from './ipc-handlers';
@@ -31,7 +31,8 @@ handleSquirrelStartup();
 
 // Global references
 let mainWindow: BrowserWindow | null = null;
-let editorView: BrowserView | null = null;
+let editorView: WebContentsView | null = null;
+let sidebarView: WebContentsView | null = null; // Separate WebContentsView for sidebar when editor is open
 let tray: Tray | null = null;
 let n8nManager: N8nManager | null = null;
 let doclingManager: DoclingManager | null = null;
@@ -48,20 +49,39 @@ const MINIMIZED_SIDEBAR_WIDTH = 64;
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
 
-// BrowserView management for n8n editor embedding
-const createEditorView = (): BrowserView => {
-  const view = new BrowserView({
+// WebContentsView management for n8n editor embedding
+const createEditorView = (): WebContentsView => {
+  const view = new WebContentsView({
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
     },
   });
+  // Set a background color for the WebContentsView
+  // WebContentsView defaults to white, so we need to set the dark background explicitly
+  view.setBackgroundColor('#1a1a1f');
+  return view;
+};
+
+// Create sidebar WebContentsView for when editor is visible
+const createSidebarView = (): WebContentsView => {
+  const view = new WebContentsView({
+    webPreferences: {
+      preload: path.join(__dirname, 'index.cjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false, // Same as main window
+    },
+  });
+  view.setBackgroundColor('#0a0a0f');
   return view;
 };
 
 const showEditor = async (workflowId?: string): Promise<void> => {
-  if (!mainWindow || !n8nManager || !authManager) return;
+  if (!mainWindow || !n8nManager || !authManager) {
+    return;
+  }
 
   const n8nUrl = n8nManager.getUrl();
   if (!n8nUrl) {
@@ -74,7 +94,7 @@ const showEditor = async (workflowId?: string): Promise<void> => {
     editorView = createEditorView();
   }
 
-  // Inject session cookie into BrowserView before loading
+  // Inject session cookie into WebContentsView before loading
   const cookieValue = authManager.getSessionCookieValue();
   if (cookieValue) {
     const port = authManager.getN8nPort();
@@ -87,7 +107,6 @@ const showEditor = async (workflowId?: string): Promise<void> => {
         httpOnly: true,
         sameSite: 'lax',
       });
-      console.log('Session cookie injected into BrowserView');
     } catch (error) {
       console.error('Failed to inject session cookie:', error);
     }
@@ -95,36 +114,65 @@ const showEditor = async (workflowId?: string): Promise<void> => {
     console.warn('No session cookie available, n8n may show login screen');
   }
 
-  // Attach to window
-  mainWindow.setBrowserView(editorView);
+  // Create sidebar view if it doesn't exist
+  if (!sidebarView) {
+    sidebarView = createSidebarView();
+  }
 
-  // Set bounds to leave space for minimized sidebar on the left
+  // Get window bounds for positioning
   const bounds = mainWindow.getContentBounds();
+
+  // Add sidebar view first (at x=0, width=64)
+  // Using contentView.addChildView for WebContentsView (replaces addBrowserView)
+  mainWindow.contentView.addChildView(sidebarView);
+  sidebarView.setBounds({
+    x: 0,
+    y: 0,
+    width: MINIMIZED_SIDEBAR_WIDTH,
+    height: bounds.height,
+  });
+  // Note: setAutoResize is not available for WebContentsView, resize is handled manually below
+
+  // Load the sidebar-only mode of the app
+  const sidebarUrl = MAIN_WINDOW_VITE_DEV_SERVER_URL
+    ? `${MAIN_WINDOW_VITE_DEV_SERVER_URL}#/sidebar-only`
+    : `file://${path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`)}#/sidebar-only`;
+  sidebarView.webContents.loadURL(sidebarUrl);
+
+  // Add editor view (at x=64)
+  // Using contentView.addChildView for WebContentsView (replaces addBrowserView)
+  mainWindow.contentView.addChildView(editorView);
   editorView.setBounds({
     x: MINIMIZED_SIDEBAR_WIDTH,
     y: 0,
     width: bounds.width - MINIMIZED_SIDEBAR_WIDTH,
     height: bounds.height,
   });
-
-  // Configure auto-resize (note: we need to manually handle resize for the sidebar offset)
-  editorView.setAutoResize({
-    width: true,
-    height: true,
-    horizontal: false,
-    vertical: false,
-  });
+  // Note: setAutoResize is not available for WebContentsView
+  // Resize is handled manually in the 'resize' event handler below
 
   // Handle window resize to maintain sidebar space
   const handleResize = () => {
-    if (editorView && mainWindow && isEditorVisible) {
+    if (mainWindow && isEditorVisible) {
       const newBounds = mainWindow.getContentBounds();
-      editorView.setBounds({
-        x: MINIMIZED_SIDEBAR_WIDTH,
-        y: 0,
-        width: newBounds.width - MINIMIZED_SIDEBAR_WIDTH,
-        height: newBounds.height,
-      });
+      // Resize sidebar view
+      if (sidebarView) {
+        sidebarView.setBounds({
+          x: 0,
+          y: 0,
+          width: MINIMIZED_SIDEBAR_WIDTH,
+          height: newBounds.height,
+        });
+      }
+      // Resize editor view
+      if (editorView) {
+        editorView.setBounds({
+          x: MINIMIZED_SIDEBAR_WIDTH,
+          y: 0,
+          width: newBounds.width - MINIMIZED_SIDEBAR_WIDTH,
+          height: newBounds.height,
+        });
+      }
     }
   };
 
@@ -138,6 +186,7 @@ const showEditor = async (workflowId?: string): Promise<void> => {
     : `${n8nUrl}/workflow/new`;
 
   editorView.webContents.loadURL(editorUrl);
+
   isEditorVisible = true;
 
   // Notify renderer that editor is visible
@@ -145,15 +194,42 @@ const showEditor = async (workflowId?: string): Promise<void> => {
 };
 
 const hideEditor = (): void => {
-  if (!mainWindow) return;
-
-  if (editorView) {
-    mainWindow.removeBrowserView(editorView);
+  console.log('[hideEditor] Called');
+  if (!mainWindow) {
+    console.log('[hideEditor] No main window');
+    return;
   }
+
+  // Remove only the views we added (editorView and sidebarView)
+  // Don't remove the main window's own content view
+  if (editorView) {
+    console.log('[hideEditor] Removing editorView');
+    mainWindow.contentView.removeChildView(editorView);
+  }
+  if (sidebarView) {
+    console.log('[hideEditor] Removing sidebarView');
+    mainWindow.contentView.removeChildView(sidebarView);
+  }
+
   isEditorVisible = false;
 
+  // Force a repaint by invalidating the webContents
+  mainWindow.webContents.invalidate();
+
+  // Also try forcing a redraw with setBackgroundColor
+  mainWindow.setBackgroundColor('#0a0a0f');
+
+  // Focus the main window
+  mainWindow.focus();
+
   // Notify renderer that editor is hidden
+  console.log('[hideEditor] Sending visibility change event');
   mainWindow.webContents.send('editor:visibilityChanged', false);
+
+  // Also tell the main window webContents to reload its styles
+  mainWindow.webContents.executeJavaScript('document.body.style.display = "none"; setTimeout(() => document.body.style.display = "", 0);').catch(() => {});
+
+  console.log('[hideEditor] Done');
 };
 
 const isEditorShowing = (): boolean => {
@@ -229,6 +305,27 @@ const createWindow = (): void => {
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.webContents.openDevTools();
   }
+
+  // Enable DevTools toggle with Ctrl+Shift+I or F12 in all builds
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (
+      (input.control && input.shift && input.key.toLowerCase() === 'i') ||
+      input.key === 'F12'
+    ) {
+      mainWindow?.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
+
+  // Forward renderer console messages to main process terminal for debugging
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    const levelNames = ['verbose', 'info', 'warning', 'error'];
+    const levelName = levelNames[level] || 'log';
+    // Only show our debug logs (starting with [)
+    if (message.startsWith('[')) {
+      console.log(`[RENDERER ${levelName}] ${message} (${sourceId}:${line})`);
+    }
+  });
 };
 
 const createTray = (): void => {
@@ -239,7 +336,7 @@ const createTray = (): void => {
     path.join(app.getAppPath(), 'resources/icon.png'),
   ];
 
-  let trayIcon: nativeImage | null = null;
+  let trayIcon: NativeImage | null = null;
 
   // Try to load icon from possible paths
   for (const iconPath of possiblePaths) {

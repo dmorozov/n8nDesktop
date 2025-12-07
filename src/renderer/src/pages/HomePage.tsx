@@ -325,8 +325,11 @@ export function HomePage() {
   }, []);
 
   const handleSelectTemplate = useCallback(async (templateId: string) => {
+    console.log('handleSelectTemplate called with templateId:', templateId);
     try {
+      console.log('Getting templates...');
       const templates = await window.electron.workflows.getTemplates();
+      console.log('Templates received:', templates?.length);
       const template = templates.find((t) => t.id === templateId);
 
       if (!template) {
@@ -334,6 +337,7 @@ export function HomePage() {
         return;
       }
 
+      console.log('Creating workflow from template:', template.name);
       const result = await window.electron.workflows.create({
         name: template.workflow.name || template.name,
         nodes: template.workflow.nodes || [],
@@ -341,10 +345,24 @@ export function HomePage() {
         settings: template.workflow.settings || {},
       });
 
+      console.log('Workflow create result:', result);
       if (result.success && result.data) {
+        console.log('Adding workflow to store...');
         addWorkflow(result.data as Workflow);
-        await openEditor(result.data.id);
-        await window.electron.workflows.addRecent(result.data.id);
+        console.log('Opening editor...');
+        try {
+          await openEditor(result.data.id);
+          console.log('Editor opened successfully');
+        } catch (editorError) {
+          console.error('Error opening editor:', editorError);
+        }
+        console.log('Adding to recent...');
+        try {
+          await window.electron.workflows.addRecent(result.data.id);
+          console.log('Added to recent');
+        } catch (recentError) {
+          console.error('Error adding to recent:', recentError);
+        }
       }
     } catch (error) {
       console.error('Error creating workflow from template:', error);

@@ -2,22 +2,65 @@ import { useState, useEffect } from 'react';
 import { useStore } from '@nanostores/react';
 import { initN8nStatusSubscription } from './stores/n8n';
 import { $settings, loadSettings } from './stores/settings';
-import { $editorVisible, initEditorVisibilitySubscription } from './stores/editor';
+import { $editorVisible, initEditorVisibilitySubscription, closeEditor } from './stores/editor';
 import { ThemeProvider } from './components/theme-provider';
 import { MainLayout } from './components/layout/MainLayout';
+import { MinimizedSidebar } from './components/layout/MinimizedSidebar';
 import { HomePage } from './pages/HomePage';
 import { RecentPage } from './pages/RecentPage';
 import { AIServicesPage } from './pages/AIServicesPage';
 import { WelcomePage } from './pages/WelcomePage';
 import { ToastContainer } from './components/ui/toast';
+import { openEditor } from './stores/editor';
 
 type Route = '/' | '/recent' | '/ai-services';
+
+// Check if we're in sidebar-only mode (loaded in a separate WebContentsView)
+const isSidebarOnlyMode = window.location.hash === '#/sidebar-only';
 
 export function App() {
   const [currentPath, setCurrentPath] = useState<Route>('/');
   const [isLoading, setIsLoading] = useState(true);
   const settings = useStore($settings);
   const editorVisible = useStore($editorVisible);
+
+
+  // If in sidebar-only mode, render just the MinimizedSidebar
+  // This is used when the editor is open - the sidebar is in a separate WebContentsView
+  if (isSidebarOnlyMode) {
+    const handleNavigate = (path: string) => {
+      // Close editor and navigate - send message to main window
+      closeEditor();
+      // Navigation will happen in main window
+    };
+
+    const handleOpenSettings = () => {
+      // Close editor first, then settings will be opened in main window
+      closeEditor();
+    };
+
+    const handleNewWorkflow = async () => {
+      // Create new workflow in the editor
+      await openEditor();
+    };
+
+    const handleCloseEditor = () => {
+      closeEditor();
+    };
+
+    return (
+      <ThemeProvider defaultTheme="dark" storageKey="n8n-desktop-theme">
+        <div className="h-screen w-16 overflow-hidden">
+          <MinimizedSidebar
+            onNavigate={handleNavigate}
+            onOpenSettings={handleOpenSettings}
+            onNewWorkflow={handleNewWorkflow}
+            onCloseEditor={handleCloseEditor}
+          />
+        </div>
+      </ThemeProvider>
+    );
+  }
 
   // Initialize subscriptions and load data
   useEffect(() => {

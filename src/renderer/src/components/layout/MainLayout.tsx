@@ -251,11 +251,6 @@ export function MainLayout({ children, currentPath, onNavigate, editorVisible = 
     }
   };
 
-  // Debug: log editorVisible state changes
-  useEffect(() => {
-    console.log('MainLayout editorVisible:', editorVisible);
-  }, [editorVisible]);
-
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground">
       {/* Show minimized sidebar when editor is visible, full sidebar otherwise */}
@@ -277,7 +272,7 @@ export function MainLayout({ children, currentPath, onNavigate, editorVisible = 
           onSelectTemplate={handleSelectTemplate}
         />
       )}
-      {/* Main content area - hidden when editor is visible (BrowserView covers it) */}
+      {/* Main content area - hidden when editor is visible (WebContentsView covers it) */}
       <main className={`flex-1 flex flex-col overflow-hidden relative ${editorVisible ? 'invisible' : ''}`}>
         {/* Theme Toggle - floating top-right */}
         <div className="absolute top-4 right-4 z-50">

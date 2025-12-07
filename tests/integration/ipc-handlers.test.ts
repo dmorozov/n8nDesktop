@@ -13,6 +13,9 @@ vi.mock('axios', () => ({
     post: vi.fn(),
     patch: vi.fn(),
     delete: vi.fn(),
+    isAxiosError: (error: unknown): boolean => {
+      return error !== null && typeof error === 'object' && 'isAxiosError' in error;
+    },
   },
 }));
 

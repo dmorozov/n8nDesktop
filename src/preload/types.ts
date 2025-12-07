@@ -331,7 +331,7 @@ export interface ElectronAPI {
     onReady: (callback: (ready: boolean) => void) => () => void;
   };
 
-  // Editor management (BrowserView)
+  // Editor management (WebContentsView)
   editor: {
     open: (workflowId?: string) => Promise<SimpleResult>;
     close: () => Promise<SimpleResult>;

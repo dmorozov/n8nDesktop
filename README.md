@@ -469,3 +469,5 @@ To run the tests, you'll need to:
 2. Run poetry install in src/docling/
 3. Run poetry run pytest for Python tests
 4. Run npm test for TypeScript tests
+
+sudo netstat -tulpn | grep :5678

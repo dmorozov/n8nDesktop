@@ -71,9 +71,9 @@ export function WorkflowHorizontalList({
           ref={scrollContainerRef}
           className="flex gap-3 overflow-x-auto pb-2 scrollbar-hidden"
         >
-          {workflows.map((workflow) => (
+          {workflows.map((workflow, index) => (
             <div
-              key={workflow.id}
+              key={workflow.id || `workflow-list-${index}`}
               className="flex-shrink-0 w-[280px] border rounded-lg p-3 bg-card hover:border-primary/50 cursor-pointer transition-colors"
               onClick={() => onEdit?.(workflow)}
             >
@@ -133,8 +133,8 @@ export function WorkflowHorizontalList({
         ref={scrollContainerRef}
         className="flex gap-4 overflow-x-auto pb-2 scrollbar-hidden"
       >
-        {workflows.map((workflow) => (
-          <div key={workflow.id} className="flex-shrink-0 w-[280px]">
+        {workflows.map((workflow, index) => (
+          <div key={workflow.id || `workflow-${index}`} className="flex-shrink-0 w-[280px]">
             <WorkflowCard
               workflow={workflow}
               isRunning={runningWorkflowIds.has(workflow.id)}
