@@ -1,5 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { ElectronAPI, N8nStatus, AppConfig, AIServiceConfig, WorkflowData, UpdateInfo } from './types';
+import type {
+  ElectronAPI,
+  N8nStatus,
+  AppConfig,
+  AIServiceConfig,
+  WorkflowData,
+  UpdateInfo,
+  DoclingStatus,
+  DoclingConfig,
+  DoclingProcessOptions,
+} from './types';
 
 // Create the API object
 const electronAPI: ElectronAPI = {
@@ -120,6 +130,56 @@ const electronAPI: ElectronAPI = {
       const listener = () => callback();
       ipcRenderer.on('updates:dismissed', listener);
       return () => ipcRenderer.removeListener('updates:dismissed', listener);
+    },
+  },
+
+  // Docling OCR service
+  docling: {
+    // Service management
+    start: () => ipcRenderer.invoke('docling:start'),
+    stop: () => ipcRenderer.invoke('docling:stop'),
+    restart: () => ipcRenderer.invoke('docling:restart'),
+    getStatus: () => ipcRenderer.invoke('docling:getStatus'),
+    healthCheck: () => ipcRenderer.invoke('docling:healthCheck'),
+    checkPython: () => ipcRenderer.invoke('docling:checkPython'),
+    isRunning: () => ipcRenderer.invoke('docling:isRunning'),
+
+    // Configuration
+    getConfig: () => ipcRenderer.invoke('docling:getConfig'),
+    updateConfig: (updates: Partial<DoclingConfig>) => ipcRenderer.invoke('docling:updateConfig', updates),
+    selectTempFolder: () => ipcRenderer.invoke('docling:selectTempFolder'),
+    getTempFolderDiskSpace: () => ipcRenderer.invoke('docling:getTempFolderDiskSpace'),
+    validateTempFolder: (folderPath: string) => ipcRenderer.invoke('docling:validateTempFolder', folderPath),
+
+    // Document processing
+    processDocument: (filePath: string, options?: DoclingProcessOptions) =>
+      ipcRenderer.invoke('docling:processDocument', filePath, options),
+    processBatch: (filePaths: string[], options?: DoclingProcessOptions) =>
+      ipcRenderer.invoke('docling:processBatch', filePaths, options),
+    getJobStatus: (jobId: string) => ipcRenderer.invoke('docling:getJobStatus', jobId),
+    listJobs: () => ipcRenderer.invoke('docling:listJobs'),
+    cancelJob: (jobId: string) => ipcRenderer.invoke('docling:cancelJob', jobId),
+
+    // Logs
+    getLogs: (lines?: number, traceId?: string) => ipcRenderer.invoke('docling:getLogs', lines, traceId),
+    clearLogs: () => ipcRenderer.invoke('docling:clearLogs'),
+
+    // Events
+    onStatusChange: (callback: (status: DoclingStatus) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, status: DoclingStatus) => callback(status);
+      ipcRenderer.on('docling:statusChange', listener);
+      return () => ipcRenderer.removeListener('docling:statusChange', listener);
+    },
+    onRestartAttempt: (callback: (attempt: number, maxAttempts: number) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, attempt: number, maxAttempts: number) =>
+        callback(attempt, maxAttempts);
+      ipcRenderer.on('docling:restartAttempt', listener);
+      return () => ipcRenderer.removeListener('docling:restartAttempt', listener);
+    },
+    onMaxRestartsExceeded: (callback: () => void) => {
+      const listener = () => callback();
+      ipcRenderer.on('docling:maxRestartsExceeded', listener);
+      return () => ipcRenderer.removeListener('docling:maxRestartsExceeded', listener);
     },
   },
 };

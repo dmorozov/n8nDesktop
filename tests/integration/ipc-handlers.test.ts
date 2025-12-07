@@ -86,6 +86,16 @@ function createMockConfigManager() {
           return 5678;
         case 'aiServices':
           return [];
+        case 'docling':
+          return {
+            enabled: true,
+            processingTier: 'standard',
+            tempFolder: '',
+            maxConcurrentJobs: 1,
+            timeoutAction: 'cancel',
+            port: 8765,
+            authToken: 'test-docling-token',
+          };
         default:
           return undefined;
       }
@@ -96,6 +106,17 @@ function createMockConfigManager() {
     updateAIService: vi.fn(),
     deleteAIService: vi.fn(),
     getAIServices: vi.fn(() => []),
+    getDoclingConfig: vi.fn(() => ({
+      enabled: true,
+      processingTier: 'standard',
+      tempFolder: '',
+      maxConcurrentJobs: 1,
+      timeoutAction: 'cancel',
+      port: 8765,
+      authToken: 'test-docling-token',
+    })),
+    updateDoclingConfig: vi.fn(),
+    getDoclingServiceUrl: vi.fn(() => 'http://127.0.0.1:8765'),
   };
 }
 

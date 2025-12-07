@@ -288,6 +288,25 @@ export interface DoclingPythonInfo {
   path?: string;
 }
 
+export interface DiskSpaceInfo {
+  totalBytes: number;
+  freeBytes: number;
+  usedBytes: number;
+  usedPercentage: number;
+}
+
+export interface DiskSpaceResult {
+  success: boolean;
+  diskSpace?: DiskSpaceInfo;
+  path: string;
+  error?: string;
+}
+
+export interface FolderValidationResult {
+  valid: boolean;
+  message: string;
+}
+
 // Template types
 export interface WorkflowTemplate {
   id: string;
@@ -417,6 +436,9 @@ export interface ElectronAPI {
     // Configuration
     getConfig: () => Promise<DoclingConfig>;
     updateConfig: (updates: Partial<DoclingConfig>) => Promise<DoclingConfig>;
+    selectTempFolder: () => Promise<{ success: boolean; canceled?: boolean; path?: string; error?: string }>;
+    getTempFolderDiskSpace: () => Promise<DiskSpaceResult>;
+    validateTempFolder: (folderPath: string) => Promise<FolderValidationResult>;
 
     // Document processing
     processDocument: (filePath: string, options?: DoclingProcessOptions) => Promise<DoclingProcessResponse>;

@@ -82,10 +82,33 @@ class MockStore<T extends Record<string, unknown>> {
   }
 }
 
+// Generate a random auth token for testing
+function generateAuthToken(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 32; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
 // Mock electron-store with custom implementation
 vi.mock('electron-store', () => ({
   default: vi.fn().mockImplementation((options: { defaults?: Record<string, unknown> }) => {
-    return new MockStore(options);
+    // Ensure docling config is in defaults
+    const defaults = options?.defaults || {};
+    if (!defaults.docling) {
+      defaults.docling = {
+        enabled: true,
+        processingTier: 'standard',
+        tempFolder: '',
+        maxConcurrentJobs: 1,
+        timeoutAction: 'cancel',
+        port: 8765,
+        authToken: generateAuthToken(),
+      };
+    }
+    return new MockStore({ defaults });
   }),
 }));
 

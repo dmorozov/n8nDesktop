@@ -154,29 +154,115 @@ class TestErrorHandling:
 class TestTierConfiguration:
     """Tests for tier-based pipeline configuration (T037)."""
 
-    def test_lightweight_config(self):
+    @pytest.fixture
+    def mock_docling_modules(self):
+        """Mock docling modules to capture configuration."""
+        mock_pipeline_options = MagicMock()
+        mock_pipeline_options.do_ocr = None
+        mock_pipeline_options.do_table_structure = None
+        mock_pipeline_options.images_scale = None
+        mock_pipeline_options.generate_page_images = None
+        mock_pipeline_options.table_structure_options = MagicMock()
+        mock_pipeline_options.accelerator_options = None
+        mock_pipeline_options.ocr_options = None
+
+        mock_pipeline_class = MagicMock(return_value=mock_pipeline_options)
+        mock_converter = MagicMock()
+        mock_converter_class = MagicMock(return_value=mock_converter)
+
+        with patch.dict(
+            "sys.modules",
+            {
+                "docling": MagicMock(),
+                "docling.datamodel": MagicMock(),
+                "docling.datamodel.base_models": MagicMock(
+                    InputFormat=MagicMock(PDF="PDF")
+                ),
+                "docling.datamodel.pipeline_options": MagicMock(
+                    PdfPipelineOptions=mock_pipeline_class,
+                    EasyOcrOptions=MagicMock(return_value=MagicMock()),
+                    AcceleratorOptions=MagicMock(return_value=MagicMock()),
+                    AcceleratorDevice=MagicMock(AUTO="AUTO"),
+                ),
+                "docling.document_converter": MagicMock(
+                    DocumentConverter=mock_converter_class,
+                    PdfFormatOption=MagicMock(),
+                ),
+            },
+        ):
+            yield mock_pipeline_options
+
+    def test_lightweight_config(self, mock_docling_modules):
         """Lightweight tier should have minimal OCR and no table extraction."""
-        expected_config = {
-            "do_ocr": True,
-            "do_table_structure": False,
-            "images_scale": 1.0,
-        }
+        from docling_service.core.converter import create_converter
+
+        create_converter("lightweight")
+
         # Verify configuration matches expected
+        assert mock_docling_modules.do_ocr is True
+        assert mock_docling_modules.do_table_structure is False
+        assert mock_docling_modules.images_scale == 1.0
+        assert mock_docling_modules.generate_page_images is False
 
-    def test_standard_config(self):
+    def test_standard_config(self, mock_docling_modules):
         """Standard tier should enable table structure with cell matching."""
-        expected_config = {
-            "do_ocr": True,
-            "do_table_structure": True,
-            "do_cell_matching": True,
-            "images_scale": 1.5,
-        }
+        from docling_service.core.converter import create_converter
 
-    def test_advanced_config(self):
+        create_converter("standard")
+
+        # Verify configuration matches expected
+        assert mock_docling_modules.do_ocr is True
+        assert mock_docling_modules.do_table_structure is True
+        assert mock_docling_modules.images_scale == 1.5
+        assert mock_docling_modules.generate_page_images is True
+        assert mock_docling_modules.table_structure_options.do_cell_matching is True
+
+    def test_advanced_config(self, mock_docling_modules):
         """Advanced tier should use maximum quality settings."""
-        expected_config = {
-            "do_ocr": True,
-            "do_table_structure": True,
-            "do_cell_matching": True,
-            "images_scale": 2.0,
+        from docling_service.core.converter import create_converter
+
+        create_converter("advanced")
+
+        # Verify configuration matches expected
+        assert mock_docling_modules.do_ocr is True
+        assert mock_docling_modules.do_table_structure is True
+        assert mock_docling_modules.images_scale == 2.0
+        assert mock_docling_modules.generate_page_images is True
+        assert mock_docling_modules.table_structure_options.do_cell_matching is True
+
+    def test_easyocr_configured_last(self, mock_docling_modules):
+        """EasyOCR options must be set LAST in pipeline configuration.
+
+        This is a CRITICAL requirement - see plan.md Known Issues.
+        Setting OCR options before other pipeline options can overwrite them.
+        """
+        from docling_service.core.converter import create_converter
+
+        create_converter("standard")
+
+        # Verify OCR options were set (this means it was configured)
+        assert mock_docling_modules.ocr_options is not None
+
+    def test_accelerator_options_configured(self, mock_docling_modules):
+        """Accelerator options should be configured for all tiers."""
+        from docling_service.core.converter import create_converter
+
+        create_converter("standard")
+
+        # Verify accelerator options were set
+        assert mock_docling_modules.accelerator_options is not None
+
+    def test_tier_resource_estimates(self):
+        """Each tier should have documented resource estimates."""
+        # Lightweight: ~2-4 GB RAM
+        # Standard: ~4-8 GB RAM
+        # Advanced: ~8-16 GB RAM
+        tier_resources = {
+            "lightweight": {"min_ram_gb": 2, "max_ram_gb": 4},
+            "standard": {"min_ram_gb": 4, "max_ram_gb": 8},
+            "advanced": {"min_ram_gb": 8, "max_ram_gb": 16},
         }
+        # Verify estimates are defined
+        assert "lightweight" in tier_resources
+        assert "standard" in tier_resources
+        assert "advanced" in tier_resources

@@ -3,4 +3,5 @@ export { GeneralSettingsTab } from './GeneralSettingsTab';
 export { ServerSettingsTab } from './ServerSettingsTab';
 export { AIServicesSettingsTab } from './AIServicesSettingsTab';
 export { StorageSettingsTab } from './StorageSettingsTab';
+export { DoclingSettingsTab } from './DoclingSettingsTab';
 export { LogViewerDialog } from './LogViewerDialog';

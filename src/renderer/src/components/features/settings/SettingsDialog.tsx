@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '@nanostores/react';
-import { Settings, Server, Cpu, FolderOpen, Sliders } from 'lucide-react';
+import { Settings, Server, Cpu, FolderOpen, Sliders, FileText } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import { GeneralSettingsTab } from './GeneralSettingsTab';
 import { ServerSettingsTab } from './ServerSettingsTab';
 import { AIServicesSettingsTab } from './AIServicesSettingsTab';
 import { StorageSettingsTab } from './StorageSettingsTab';
+import { DoclingSettingsTab } from './DoclingSettingsTab';
 import {
   $settings,
   $hasUnsavedChanges,
@@ -23,7 +24,7 @@ import {
 interface SettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  defaultTab?: 'general' | 'server' | 'ai' | 'storage';
+  defaultTab?: 'general' | 'server' | 'ai' | 'storage' | 'docling';
 }
 
 export function SettingsDialog({
@@ -72,7 +73,7 @@ export function SettingsDialog({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="general" className="flex items-center gap-2">
               <Sliders className="h-4 w-4" />
               <span className="hidden sm:inline">General</span>
@@ -84,6 +85,10 @@ export function SettingsDialog({
             <TabsTrigger value="ai" className="flex items-center gap-2">
               <Cpu className="h-4 w-4" />
               <span className="hidden sm:inline">AI</span>
+            </TabsTrigger>
+            <TabsTrigger value="docling" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">Docling</span>
             </TabsTrigger>
             <TabsTrigger value="storage" className="flex items-center gap-2">
               <FolderOpen className="h-4 w-4" />
@@ -110,6 +115,14 @@ export function SettingsDialog({
 
             <TabsContent value="ai" className="mt-0">
               <AIServicesSettingsTab
+                onSave={handleSave}
+                isSaving={isSaving}
+                hasChanges={hasUnsavedChanges}
+              />
+            </TabsContent>
+
+            <TabsContent value="docling" className="mt-0">
+              <DoclingSettingsTab
                 onSave={handleSave}
                 isSaving={isSaving}
                 hasChanges={hasUnsavedChanges}

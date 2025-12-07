@@ -2,6 +2,15 @@ import { IpcMain, dialog, BrowserWindow } from 'electron';
 import { DoclingManager, DoclingStatus } from '../docling-manager';
 import { ConfigManager, DoclingConfig } from '../config-manager';
 import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
+import os from 'os';
+
+interface DiskSpaceInfo {
+  totalBytes: number;
+  freeBytes: number;
+  usedBytes: number;
+  usedPercentage: number;
+}
 
 interface DoclingProcessOptions {
   processingTier?: 'lightweight' | 'standard' | 'advanced';
@@ -126,6 +135,74 @@ export function registerDoclingHandlers(
     configManager.updateDoclingConfig({ tempFolder: selectedPath });
 
     return { success: true, path: selectedPath };
+  });
+
+  /**
+   * Get disk space info for temp folder (T051)
+   */
+  ipcMain.handle('docling:getTempFolderDiskSpace', async () => {
+    const config = configManager.getDoclingConfig();
+    const tempFolder = config.tempFolder || os.tmpdir();
+
+    try {
+      // Use statfs on Unix-like systems, different approach for Windows
+      const stats = fs.statfsSync(tempFolder);
+      const blockSize = stats.bsize;
+      const totalBlocks = stats.blocks;
+      const freeBlocks = stats.bfree;
+
+      const totalBytes = totalBlocks * blockSize;
+      const freeBytes = freeBlocks * blockSize;
+      const usedBytes = totalBytes - freeBytes;
+      const usedPercentage = totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0;
+
+      return {
+        success: true,
+        diskSpace: {
+          totalBytes,
+          freeBytes,
+          usedBytes,
+          usedPercentage,
+        } as DiskSpaceInfo,
+        path: tempFolder,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get disk space info',
+        path: tempFolder,
+      };
+    }
+  });
+
+  /**
+   * Validate temp folder path
+   */
+  ipcMain.handle('docling:validateTempFolder', async (_event, folderPath: string) => {
+    if (!folderPath) {
+      // Empty means system default, which is always valid
+      return { valid: true, message: 'Using system default temp folder' };
+    }
+
+    try {
+      // Check if path exists
+      if (!fs.existsSync(folderPath)) {
+        // Try to create it
+        fs.mkdirSync(folderPath, { recursive: true });
+      }
+
+      // Check write access
+      const testFile = `${folderPath}/.write-test-${Date.now()}`;
+      fs.writeFileSync(testFile, 'test');
+      fs.unlinkSync(testFile);
+
+      return { valid: true, message: 'Folder is accessible and writable' };
+    } catch (error) {
+      return {
+        valid: false,
+        message: error instanceof Error ? error.message : 'Folder is not accessible or writable',
+      };
+    }
   });
 
   // ==================== DOCUMENT PROCESSING ====================

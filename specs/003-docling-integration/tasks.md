@@ -112,19 +112,19 @@
 
 ### Tests for User Story 2
 
-- [ ] T037 [P] [US2] Unit test for tier-based pipeline configuration in `src/docling/tests/test_converter.py`
+- [x] T037 [P] [US2] Unit test for tier-based pipeline configuration in `src/docling/tests/test_converter.py`
 - [ ] T038 [P] [US2] Component test for DoclingSettingsTab tier selection (manual verification or snapshot)
 
 ### Implementation for User Story 2
 
-- [ ] T039 [US2] Create Docling nanostores state in `src/renderer/src/stores/docling.ts` for status and actions
-- [ ] T040 [US2] Create DoclingSettingsTab component in `src/renderer/src/components/features/settings/DoclingSettingsTab.tsx`
-- [ ] T041 [US2] Add processing tier dropdown with descriptions to DoclingSettingsTab
-- [ ] T042 [US2] Add max concurrent jobs selector (1-3) to DoclingSettingsTab
-- [ ] T043 [US2] Add timeout action dropdown (cancel/extend/notify) to DoclingSettingsTab
-- [ ] T044 [US2] Register DoclingSettingsTab in SettingsDialog.tsx with Docling tab
-- [ ] T045 [US2] Wire tier selection to ConfigManager persistence via IPC
-- [ ] T045a [US2] Implement resource check warning when user selects Advanced tier with insufficient RAM (<16GB) in DoclingSettingsTab
+- [x] T039 [US2] Create Docling nanostores state in `src/renderer/src/stores/docling.ts` for status and actions
+- [x] T040 [US2] Create DoclingSettingsTab component in `src/renderer/src/components/features/settings/DoclingSettingsTab.tsx`
+- [x] T041 [US2] Add processing tier dropdown with descriptions to DoclingSettingsTab
+- [x] T042 [US2] Add max concurrent jobs selector (1-3) to DoclingSettingsTab
+- [x] T043 [US2] Add timeout action dropdown (cancel/extend/notify) to DoclingSettingsTab
+- [x] T044 [US2] Register DoclingSettingsTab in SettingsDialog.tsx with Docling tab
+- [x] T045 [US2] Wire tier selection to ConfigManager persistence via IPC
+- [x] T045a [US2] Implement resource check warning when user selects Advanced tier with insufficient RAM (<16GB) in DoclingSettingsTab
 
 **Checkpoint**: User Story 2 complete - Processing tier configuration works, persists between sessions
 
@@ -138,15 +138,15 @@
 
 ### Tests for User Story 3
 
-- [ ] T046 [P] [US3] Unit test for temp folder validation in `src/docling/tests/test_config.py`
+- [x] T046 [P] [US3] Unit test for temp folder validation in `src/docling/tests/test_config.py`
 
 ### Implementation for User Story 3
 
-- [ ] T047 [US3] Add temp folder input with Browse button to DoclingSettingsTab
-- [ ] T048 [US3] Implement folder browser dialog via IPC in `src/main/ipc-handlers/docling.ts`
-- [ ] T049 [US3] Add temp folder validation (exists, writable) in DoclingManager
-- [ ] T050 [US3] Pass temp folder to Python service via CLI arg in DoclingManager start()
-- [ ] T051 [US3] Display disk space usage for temp folder in DoclingSettingsTab
+- [x] T047 [US3] Add temp folder input with Browse button to DoclingSettingsTab *(completed in Phase 4)*
+- [x] T048 [US3] Implement folder browser dialog via IPC in `src/main/ipc-handlers/docling.ts`
+- [x] T049 [US3] Add temp folder validation (exists, writable) in DoclingManager *(via isDoclingTempFolderValid in ConfigManager + validateTempFolder IPC)*
+- [x] T050 [US3] Pass temp folder to Python service via CLI arg in DoclingManager start() *(completed in Phase 2)*
+- [x] T051 [US3] Display disk space usage for temp folder in DoclingSettingsTab
 
 **Checkpoint**: User Story 3 complete - Temp folder configuration works
 
