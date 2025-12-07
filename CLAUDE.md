@@ -47,6 +47,8 @@ Constitution: `.specify/memory/constitution.md`
 ## Active Technologies
 - TypeScript 5.6+, Node.js 20.x LTS + Electron 28+, Preact 10.24+, Vite 5+, TailwindCSS 4+, n8n (bundled) (002-ui-design)
 - electron-store (JSON), Electron safeStorage (API keys), n8n SQLite (workflows) (002-ui-design)
+- Python 3.10+ (Docling), TypeScript 5.6+ (Electron/React) (003-docling-integration)
+- File-based (temp folder for processing), electron-store (config) (003-docling-integration)
 
 ## Recent Changes
 - 002-ui-design: Added TypeScript 5.6+, Node.js 20.x LTS + Electron 28+, Preact 10.24+, Vite 5+, TailwindCSS 4+, n8n (bundled)

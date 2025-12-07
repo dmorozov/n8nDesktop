@@ -29,6 +29,26 @@ export interface N8nOwnerCredentials {
   encryptedPassword?: string;
 }
 
+export type DoclingProcessingTier = 'lightweight' | 'standard' | 'advanced';
+export type DoclingTimeoutAction = 'cancel' | 'extend' | 'notify';
+
+export interface DoclingConfig {
+  /** Whether Docling service is enabled */
+  enabled: boolean;
+  /** Processing tier (lightweight, standard, advanced) */
+  processingTier: DoclingProcessingTier;
+  /** Custom temporary folder for processing files (empty = default system temp) */
+  tempFolder: string;
+  /** Maximum concurrent processing jobs (1-3) */
+  maxConcurrentJobs: number;
+  /** Action when processing times out */
+  timeoutAction: DoclingTimeoutAction;
+  /** Port for the Docling service (default: 8765) */
+  port: number;
+  /** Authentication token for API access */
+  authToken: string;
+}
+
 export interface AppConfig {
   // First run
   firstRunComplete: boolean;
@@ -53,8 +73,21 @@ export interface AppConfig {
   // AI Services
   aiServices: AIServiceConfig[];
 
+  // Docling OCR Service
+  docling: DoclingConfig;
+
   // Window state
   windowBounds: WindowBounds;
+}
+
+/** Generate a random authentication token */
+function generateAuthToken(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 32; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
 }
 
 const defaultConfig: AppConfig = {
@@ -69,6 +102,15 @@ const defaultConfig: AppConfig = {
   runInBackground: true,
   maxConcurrentWorkflows: 3,
   aiServices: [],
+  docling: {
+    enabled: true,
+    processingTier: 'standard',
+    tempFolder: '',
+    maxConcurrentJobs: 1,
+    timeoutAction: 'cancel',
+    port: 8765,
+    authToken: generateAuthToken(),
+  },
   windowBounds: {
     width: 1200,
     height: 800,
@@ -117,6 +159,19 @@ export class ConfigManager {
             },
             required: ['id', 'name', 'type', 'endpoint', 'isEnabled', 'createdAt', 'updatedAt'],
           },
+        },
+        docling: {
+          type: 'object',
+          properties: {
+            enabled: { type: 'boolean' },
+            processingTier: { type: 'string', enum: ['lightweight', 'standard', 'advanced'] },
+            tempFolder: { type: 'string' },
+            maxConcurrentJobs: { type: 'number', minimum: 1, maximum: 3 },
+            timeoutAction: { type: 'string', enum: ['cancel', 'extend', 'notify'] },
+            port: { type: 'number', minimum: 1024, maximum: 65535 },
+            authToken: { type: 'string' },
+          },
+          required: ['enabled', 'processingTier', 'maxConcurrentJobs', 'timeoutAction', 'port', 'authToken'],
         },
         windowBounds: {
           type: 'object',
@@ -261,5 +316,56 @@ export class ConfigManager {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Get Docling configuration
+   */
+  getDoclingConfig(): DoclingConfig {
+    return this.store.get('docling');
+  }
+
+  /**
+   * Update Docling configuration
+   */
+  updateDoclingConfig(updates: Partial<DoclingConfig>): DoclingConfig {
+    const current = this.store.get('docling');
+    const updated = { ...current, ...updates };
+    this.store.set('docling', updated);
+    return updated;
+  }
+
+  /**
+   * Check if Docling temp folder is valid and accessible
+   */
+  isDoclingTempFolderValid(): boolean {
+    const config = this.store.get('docling');
+    const tempFolder = config.tempFolder;
+
+    // Empty means use system default, which is always valid
+    if (!tempFolder) {
+      return true;
+    }
+
+    try {
+      if (!fs.existsSync(tempFolder)) {
+        fs.mkdirSync(tempFolder, { recursive: true });
+      }
+      // Test write access
+      const testFile = path.join(tempFolder, '.write-test');
+      fs.writeFileSync(testFile, 'test');
+      fs.unlinkSync(testFile);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get Docling service URL
+   */
+  getDoclingServiceUrl(): string {
+    const config = this.store.get('docling');
+    return `http://127.0.0.1:${config.port}`;
   }
 }

@@ -3,9 +3,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { registerIpcHandlers } from './ipc-handlers';
 import { N8nManager } from './n8n-manager';
+import { DoclingManager } from './docling-manager';
 import { ConfigManager } from './config-manager';
 import { UpdateChecker } from './services/update-checker';
 import { registerUpdateHandlers } from './ipc-handlers/updates';
+import { registerDoclingHandlers } from './ipc-handlers/docling';
 import { N8nAuthManager } from './services/n8n-auth-manager';
 
 // ESM compatibility for __dirname
@@ -32,6 +34,7 @@ let mainWindow: BrowserWindow | null = null;
 let editorView: BrowserView | null = null;
 let tray: Tray | null = null;
 let n8nManager: N8nManager | null = null;
+let doclingManager: DoclingManager | null = null;
 let configManager: ConfigManager | null = null;
 let updateChecker: UpdateChecker | null = null;
 let authManager: N8nAuthManager | null = null;
@@ -366,6 +369,15 @@ const gracefulShutdown = async (): Promise<void> => {
     }
   }
 
+  // Stop Docling service first (it's faster)
+  if (doclingManager?.isRunning()) {
+    try {
+      await doclingManager.stop();
+    } catch (error) {
+      console.error('Error stopping Docling:', error);
+    }
+  }
+
   // Stop n8n with 5-second timeout
   if (n8nManager?.isRunning()) {
     const shutdownPromise = n8nManager.stop();
@@ -389,6 +401,9 @@ const initializeApp = async (): Promise<void> => {
   // Initialize n8n manager
   n8nManager = new N8nManager(configManager);
 
+  // Initialize Docling manager
+  doclingManager = new DoclingManager(configManager);
+
   // Initialize auth manager
   authManager = new N8nAuthManager(configManager);
 
@@ -405,6 +420,9 @@ const initializeApp = async (): Promise<void> => {
 
   // Register update handlers
   registerUpdateHandlers(ipcMain, updateChecker, () => mainWindow);
+
+  // Register Docling handlers
+  registerDoclingHandlers(ipcMain, doclingManager, configManager, mainWindow);
 
   // Create main window
   createWindow();
@@ -423,6 +441,22 @@ const initializeApp = async (): Promise<void> => {
     } catch (error) {
       console.error('Failed to start n8n server:', error);
       // Error will be shown in UI via status
+    }
+
+    // Start Docling service if enabled
+    const doclingConfig = configManager.getDoclingConfig();
+    if (doclingConfig.enabled) {
+      try {
+        // Check Python availability first
+        const pythonInfo = await doclingManager.checkPython();
+        if (pythonInfo.available) {
+          await doclingManager.start();
+        } else {
+          console.warn('Docling: Python 3.10+ not available, service not started');
+        }
+      } catch (error) {
+        console.error('Failed to start Docling service:', error);
+      }
     }
   }
 
@@ -494,4 +528,4 @@ app.on('before-quit', async (event) => {
 });
 
 // Export for IPC handlers to access
-export { mainWindow, n8nManager, configManager, authManager, showEditor, hideEditor, isEditorShowing };
+export { mainWindow, n8nManager, doclingManager, configManager, authManager, showEditor, hideEditor, isEditorShowing };

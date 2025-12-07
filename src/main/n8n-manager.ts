@@ -130,6 +130,9 @@ export class N8nManager extends EventEmitter {
       fs.mkdirSync(n8nFolder, { recursive: true });
     }
 
+    // Get Docling configuration for environment variables
+    const doclingConfig = this.configManager.getDoclingConfig();
+
     // Environment variables for n8n
     const env: NodeJS.ProcessEnv = {
       ...process.env,
@@ -144,6 +147,11 @@ export class N8nManager extends EventEmitter {
       N8N_TEMPLATES_ENABLED: 'false',
       // Disable external connections for security
       N8N_HIRING_BANNER_ENABLED: 'false',
+      // Docling service configuration for n8n workflows to use
+      DOCLING_API_URL: `http://127.0.0.1:${doclingConfig.port}/api/v1`,
+      DOCLING_API_PORT: doclingConfig.port.toString(),
+      DOCLING_AUTH_TOKEN: doclingConfig.authToken,
+      DOCLING_ENABLED: doclingConfig.enabled ? 'true' : 'false',
     };
 
     return new Promise((resolve) => {

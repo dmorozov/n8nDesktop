@@ -189,6 +189,105 @@ export interface ExportResult {
   error?: string;
 }
 
+// Docling OCR service types
+export type DoclingProcessingTier = 'lightweight' | 'standard' | 'advanced';
+export type DoclingTimeoutAction = 'cancel' | 'extend' | 'notify';
+export type DoclingServiceStatus = 'starting' | 'running' | 'stopped' | 'error';
+
+export interface DoclingConfig {
+  enabled: boolean;
+  processingTier: DoclingProcessingTier;
+  tempFolder: string;
+  maxConcurrentJobs: number;
+  timeoutAction: DoclingTimeoutAction;
+  port: number;
+  authToken: string;
+}
+
+export interface DoclingStatus {
+  status: DoclingServiceStatus;
+  port: number;
+  version: string;
+  uptime: number;
+  url: string;
+  error?: string;
+  restartAttempts: number;
+  pythonAvailable: boolean;
+  queueSize: number;
+  activeJobs: number;
+}
+
+export interface DoclingStartResult {
+  success: boolean;
+  port?: number;
+  error?: string;
+}
+
+export interface DoclingHealthResponse {
+  status: 'healthy' | 'unhealthy';
+  version: string;
+  processing_tier: string;
+  queue_size: number;
+  active_jobs: number;
+  trace_id?: string;
+}
+
+export interface DoclingProcessOptions {
+  processingTier?: DoclingProcessingTier;
+  languages?: string[];
+  forceFullPageOcr?: boolean;
+  timeoutSeconds?: number;
+}
+
+export interface DoclingJobStatus {
+  jobId: string;
+  filePath: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  progress: number;
+  result?: DoclingProcessResult;
+  error?: string;
+  errorType?: string;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  traceId?: string;
+}
+
+export interface DoclingProcessResult {
+  status: 'success' | 'error';
+  markdown?: string;
+  metadata?: {
+    pageCount?: number;
+    filePath?: string;
+    processingTier?: string;
+    format?: string;
+    processingTimeMs?: number;
+    ocrEngine?: string;
+  };
+  error?: string;
+}
+
+export interface DoclingProcessResponse {
+  jobId: string;
+  status: string;
+  message: string;
+  traceId?: string;
+}
+
+export interface DoclingBatchResponse {
+  jobIds: string[];
+  status: string;
+  totalDocuments: number;
+  correlationId?: string;
+  traceId?: string;
+}
+
+export interface DoclingPythonInfo {
+  available: boolean;
+  version?: string;
+  path?: string;
+}
+
 // Template types
 export interface WorkflowTemplate {
   id: string;
@@ -302,6 +401,38 @@ export interface ElectronAPI {
     getLastCheckTime: () => Promise<string | null>;
     onUpdateAvailable: (callback: (info: UpdateInfo) => void) => () => void;
     onUpdateDismissed: (callback: () => void) => () => void;
+  };
+
+  // Docling OCR service
+  docling: {
+    // Service management
+    start: () => Promise<DoclingStartResult>;
+    stop: () => Promise<SimpleResult>;
+    restart: () => Promise<DoclingStartResult>;
+    getStatus: () => Promise<DoclingStatus>;
+    healthCheck: () => Promise<DoclingHealthResponse | null>;
+    checkPython: () => Promise<DoclingPythonInfo>;
+    isRunning: () => Promise<boolean>;
+
+    // Configuration
+    getConfig: () => Promise<DoclingConfig>;
+    updateConfig: (updates: Partial<DoclingConfig>) => Promise<DoclingConfig>;
+
+    // Document processing
+    processDocument: (filePath: string, options?: DoclingProcessOptions) => Promise<DoclingProcessResponse>;
+    processBatch: (filePaths: string[], options?: DoclingProcessOptions) => Promise<DoclingBatchResponse>;
+    getJobStatus: (jobId: string) => Promise<DoclingJobStatus | null>;
+    listJobs: () => Promise<DoclingJobStatus[]>;
+    cancelJob: (jobId: string) => Promise<SimpleResult>;
+
+    // Logs
+    getLogs: (lines?: number, traceId?: string) => Promise<string[]>;
+    clearLogs: () => Promise<SimpleResult>;
+
+    // Events
+    onStatusChange: (callback: (status: DoclingStatus) => void) => () => void;
+    onRestartAttempt: (callback: (attempt: number, maxAttempts: number) => void) => () => void;
+    onMaxRestartsExceeded: (callback: () => void) => () => void;
   };
 }
 

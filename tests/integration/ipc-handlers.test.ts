@@ -99,14 +99,29 @@ function createMockConfigManager() {
   };
 }
 
+// Mock N8nAuthManager
+function createMockAuthManager() {
+  return {
+    getAuthHeaders: vi.fn(() => ({
+      'Content-Type': 'application/json',
+      'Cookie': 'n8n-auth=test-token',
+    })),
+    isAuthenticated: vi.fn(() => true),
+    login: vi.fn(() => Promise.resolve(true)),
+    logout: vi.fn(() => Promise.resolve()),
+  };
+}
+
 describe('IPC Handlers Integration Tests', () => {
   let mockIpcMain: MockIpcMain;
   let mockConfigManager: ReturnType<typeof createMockConfigManager>;
+  let mockAuthManager: ReturnType<typeof createMockAuthManager>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockIpcMain = new MockIpcMain();
     mockConfigManager = createMockConfigManager();
+    mockAuthManager = createMockAuthManager();
   });
 
   describe('Workflow Handlers', () => {
@@ -116,7 +131,8 @@ describe('IPC Handlers Integration Tests', () => {
       registerWorkflowHandlers(
         mockIpcMain as unknown as import('electron').IpcMain,
         mockConfigManager as unknown as import('@main/config-manager').ConfigManager,
-        () => 5678
+        () => 5678,
+        mockAuthManager as unknown as import('@main/services/n8n-auth-manager').N8nAuthManager
       );
     });
 
@@ -155,7 +171,10 @@ describe('IPC Handlers Integration Tests', () => {
           success: true,
           data: mockWorkflows,
         });
-        expect(axios.get).toHaveBeenCalledWith('http://localhost:5678/api/v1/workflows');
+        expect(axios.get).toHaveBeenCalledWith(
+          'http://localhost:5678/rest/workflows',
+          expect.objectContaining({ headers: expect.any(Object) })
+        );
       });
 
       it('should handle API errors', async () => {
@@ -184,7 +203,10 @@ describe('IPC Handlers Integration Tests', () => {
           success: true,
           data: mockWorkflow,
         });
-        expect(axios.get).toHaveBeenCalledWith('http://localhost:5678/api/v1/workflows/1');
+        expect(axios.get).toHaveBeenCalledWith(
+          'http://localhost:5678/rest/workflows/1',
+          expect.objectContaining({ headers: expect.any(Object) })
+        );
       });
     });
 
@@ -215,12 +237,13 @@ describe('IPC Handlers Integration Tests', () => {
           data: createdWorkflow,
         });
         expect(axios.post).toHaveBeenCalledWith(
-          'http://localhost:5678/api/v1/workflows',
+          'http://localhost:5678/rest/workflows',
           expect.objectContaining({
             name: 'New Workflow',
             nodes: [],
             connections: {},
-          })
+          }),
+          expect.objectContaining({ headers: expect.any(Object) })
         );
       });
     });
@@ -245,8 +268,9 @@ describe('IPC Handlers Integration Tests', () => {
           data: updatedWorkflow,
         });
         expect(axios.patch).toHaveBeenCalledWith(
-          'http://localhost:5678/api/v1/workflows/1',
-          updates
+          'http://localhost:5678/rest/workflows/1',
+          updates,
+          expect.objectContaining({ headers: expect.any(Object) })
         );
       });
     });
@@ -258,7 +282,10 @@ describe('IPC Handlers Integration Tests', () => {
         const result = await mockIpcMain.invoke('workflows:delete', '1');
 
         expect(result).toEqual({ success: true });
-        expect(axios.delete).toHaveBeenCalledWith('http://localhost:5678/api/v1/workflows/1');
+        expect(axios.delete).toHaveBeenCalledWith(
+          'http://localhost:5678/rest/workflows/1',
+          expect.objectContaining({ headers: expect.any(Object) })
+        );
       });
 
       it('should handle deletion errors', async () => {
@@ -315,7 +342,11 @@ describe('IPC Handlers Integration Tests', () => {
           success: true,
           executionId: 'exec-123',
         });
-        expect(axios.post).toHaveBeenCalledWith('http://localhost:5678/api/v1/workflows/1/run');
+        expect(axios.post).toHaveBeenCalledWith(
+          'http://localhost:5678/rest/workflows/1/run',
+          expect.any(Object),
+          expect.objectContaining({ headers: expect.any(Object) })
+        );
       });
     });
 
@@ -327,7 +358,9 @@ describe('IPC Handlers Integration Tests', () => {
 
         expect(result).toEqual({ success: true });
         expect(axios.post).toHaveBeenCalledWith(
-          'http://localhost:5678/api/v1/executions/exec-123/stop'
+          'http://localhost:5678/rest/executions/exec-123/stop',
+          expect.any(Object),
+          expect.objectContaining({ headers: expect.any(Object) })
         );
       });
     });

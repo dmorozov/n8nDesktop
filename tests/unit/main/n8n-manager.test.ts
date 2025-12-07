@@ -4,9 +4,18 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Mock electron
+vi.mock('electron', () => ({
+  app: {
+    isPackaged: false,
+    getAppPath: () => '/mock/app/path',
+  },
+}));
+
 // Mock child_process - but don't import EventEmitter directly in mock
 vi.mock('child_process', () => ({
   spawn: vi.fn(),
+  execSync: vi.fn(),
 }));
 
 // Mock fs
@@ -59,6 +68,19 @@ function createMockConfigManager(): ConfigManager {
     getAIServices: vi.fn(),
     getConfigPath: vi.fn(),
     isDataFolderValid: vi.fn(),
+    // Docling config methods
+    getDoclingConfig: vi.fn(() => ({
+      enabled: true,
+      processingTier: 'standard',
+      tempFolder: '',
+      maxConcurrentJobs: 1,
+      timeoutAction: 'cancel',
+      port: 8765,
+      authToken: 'test-auth-token',
+    })),
+    updateDoclingConfig: vi.fn(),
+    isDoclingTempFolderValid: vi.fn(() => true),
+    getDoclingServiceUrl: vi.fn(() => 'http://127.0.0.1:8765'),
   } as unknown as ConfigManager;
 
   return mockConfigManager;
@@ -135,6 +157,17 @@ describe('N8nManager', () => {
     });
 
     it('should call spawn when starting', async () => {
+      // Make fs.existsSync return false for n8n binary paths but true for data folder
+      vi.mocked(fs.existsSync).mockImplementation((pathArg) => {
+        const pathStr = String(pathArg);
+        // Return false for n8n binary checks to force npx fallback
+        if (pathStr.includes('n8n') && (pathStr.includes('.bin') || pathStr.includes('bin'))) {
+          return false;
+        }
+        // Return true for data folder check
+        return true;
+      });
+
       // Create a mock process
       const mockProcess = new EventEmitter() as EventEmitter & {
         stdout: EventEmitter;

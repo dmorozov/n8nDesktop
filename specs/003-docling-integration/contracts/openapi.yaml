@@ -1,0 +1,341 @@
+openapi: 3.1.0
+info:
+  title: Docling Service API
+  description: |
+    Document processing API for n8n Desktop application.
+    Provides endpoints for converting PDF, DOCX, XLSX, and image files
+    to page-annotated Markdown format using IBM Granite Docling.
+  version: 0.1.0
+  contact:
+    name: n8n Desktop Team
+
+servers:
+  - url: http://localhost:{port}/api/v1
+    description: Local Docling service
+    variables:
+      port:
+        default: "8001"
+        description: Dynamic port assigned at service startup
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Returns service health status and queue statistics
+      operationId: healthCheck
+      security: []  # No auth required for health check
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /process:
+    post:
+      summary: Process single document
+      description: |
+        Submit a single document for processing. Returns a job ID
+        that can be used to poll for completion status.
+      operationId: processSingleDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProcessRequest"
+      responses:
+        "200":
+          description: Document queued for processing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessResponse"
+        "401":
+          description: Missing or invalid authentication
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /process/batch:
+    post:
+      summary: Process multiple documents
+      description: |
+        Submit multiple documents for batch processing. Returns job IDs
+        for each document that can be polled individually.
+      operationId: processBatchDocuments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchProcessRequest"
+      responses:
+        "200":
+          description: Documents queued for processing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchProcessResponse"
+        "401":
+          description: Missing or invalid authentication
+        "422":
+          description: Invalid request parameters
+
+  /jobs:
+    get:
+      summary: List all jobs
+      description: Returns status of all jobs in the queue
+      operationId: listJobs
+      responses:
+        "200":
+          description: List of all jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JobStatus"
+
+  /jobs/{job_id}:
+    get:
+      summary: Get job status
+      description: Returns detailed status of a specific job including results if completed
+      operationId: getJobStatus
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the processing job
+      responses:
+        "200":
+          description: Job status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobStatus"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      summary: Cancel job
+      description: Cancel a queued job. Only queued jobs can be cancelled.
+      operationId: cancelJob
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Job cancelled successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: cancelled
+                  job_id:
+                    type: string
+                    format: uuid
+        "404":
+          description: Job not found or already completed
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Shared secret token generated at Electron app startup.
+        Passed to n8n workflows via DOCLING_AUTH_TOKEN environment variable.
+
+  schemas:
+    ProcessRequest:
+      type: object
+      required:
+        - file_path
+      properties:
+        file_path:
+          type: string
+          description: Absolute path to the document file
+          example: /home/user/documents/report.pdf
+        options:
+          $ref: "#/components/schemas/ProcessingOptions"
+
+    BatchProcessRequest:
+      type: object
+      required:
+        - file_paths
+      properties:
+        file_paths:
+          type: array
+          items:
+            type: string
+          description: Array of absolute paths to document files
+          example:
+            - /home/user/documents/report1.pdf
+            - /home/user/documents/report2.docx
+        options:
+          $ref: "#/components/schemas/ProcessingOptions"
+
+    ProcessingOptions:
+      type: object
+      properties:
+        processing_tier:
+          type: string
+          enum: [lightweight, standard, advanced]
+          description: Override the default processing tier
+        languages:
+          type: array
+          items:
+            type: string
+          description: OCR language codes
+          example: ["en", "fr"]
+        force_full_page_ocr:
+          type: boolean
+          default: false
+          description: Force OCR on all pages (slower but more accurate for scanned documents)
+        timeout_seconds:
+          type: integer
+          description: Override calculated timeout
+
+    ProcessResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+          description: Unique identifier for tracking the job
+        status:
+          type: string
+          example: queued
+        message:
+          type: string
+          example: Document queued for processing
+
+    BatchProcessResponse:
+      type: object
+      properties:
+        job_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: UUIDs for each submitted document
+        status:
+          type: string
+          example: queued
+        total_documents:
+          type: integer
+          description: Number of documents submitted
+
+    JobStatus:
+      type: object
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        file_path:
+          type: string
+        status:
+          type: string
+          enum: [queued, processing, completed, failed, cancelled]
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        result:
+          $ref: "#/components/schemas/ProcessingResult"
+        error:
+          type: string
+          description: Error message if status is "failed"
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+
+    ProcessingResult:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success, error]
+        markdown:
+          type: string
+          description: Page-annotated Markdown content
+        metadata:
+          $ref: "#/components/schemas/ProcessingMetadata"
+        error:
+          type: string
+
+    ProcessingMetadata:
+      type: object
+      properties:
+        page_count:
+          type: integer
+        file_path:
+          type: string
+        processing_tier:
+          type: string
+        format:
+          type: string
+          example: pdf
+        processing_time_ms:
+          type: integer
+        ocr_engine:
+          type: string
+          example: easyocr
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+        version:
+          type: string
+          example: "0.1.0"
+        processing_tier:
+          type: string
+          example: standard
+        queue_size:
+          type: integer
+          description: Number of jobs waiting in queue
+        active_jobs:
+          type: integer
+          description: Number of jobs currently processing
+
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string
+          description: Error message
