@@ -1,0 +1,20 @@
+{
+      "id:": "pdf-processing",
+      "name": "PDF Processing",
+      "description": "Extract and transform document data",
+      "icon": "file",
+      "workflow": {
+        "name": "PDF Processing",
+        "nodes": [
+        {
+            "id": "trigger",
+            "name": "Manual Trigger",
+            "type": "n8n-nodes-base.manualTrigger",
+            "position": [ 250, 300 ],
+            "parameters": {}
+        }
+        ],
+        "connections": {},
+        "settings": {}
+    }
+}
