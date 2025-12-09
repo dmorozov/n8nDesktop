@@ -61,6 +61,18 @@ const createEditorView = (): WebContentsView => {
   // Set a background color for the WebContentsView
   // WebContentsView defaults to white, so we need to set the dark background explicitly
   view.setBackgroundColor('#1a1a1f');
+
+  // Enable DevTools toggle with Ctrl+Shift+I or F12 for the n8n editor
+  view.webContents.on('before-input-event', (event, input) => {
+    if (
+      (input.control && input.shift && input.key.toLowerCase() === 'i') ||
+      input.key === 'F12'
+    ) {
+      view.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
+
   return view;
 };
 
@@ -75,6 +87,18 @@ const createSidebarView = (): WebContentsView => {
     },
   });
   view.setBackgroundColor('#0a0a0f');
+
+  // Enable DevTools toggle with Ctrl+Shift+I or F12 for the sidebar
+  view.webContents.on('before-input-event', (event, input) => {
+    if (
+      (input.control && input.shift && input.key.toLowerCase() === 'i') ||
+      input.key === 'F12'
+    ) {
+      view.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
+
   return view;
 };
 
@@ -302,9 +326,9 @@ const createWindow = (): void => {
   });
 
   // Open the DevTools in development
-  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-    mainWindow.webContents.openDevTools();
-  }
+  // if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+  //  mainWindow.webContents.openDevTools();
+  // }
 
   // Enable DevTools toggle with Ctrl+Shift+I or F12 in all builds
   mainWindow.webContents.on('before-input-event', (event, input) => {
