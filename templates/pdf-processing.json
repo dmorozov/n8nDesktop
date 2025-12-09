@@ -1,20 +1,100 @@
 {
-      "id:": "pdf-processing",
-      "name": "PDF Processing",
-      "description": "Extract and transform document data",
-      "icon": "file",
-      "workflow": {
-        "name": "PDF Processing",
-        "nodes": [
-        {
-            "id": "trigger",
-            "name": "Manual Trigger",
-            "type": "n8n-nodes-base.manualTrigger",
-            "position": [ 250, 300 ],
-            "parameters": {}
-        }
-        ],
-        "connections": {},
-        "settings": {}
-    }
+  "id:": "pdf-processing",
+  "name": "PDF Processing",
+  "description": "Extract and transform document data",
+  "icon": "file",
+  "workflow": {
+    "name": "PDF Processing",
+    "nodes": [
+      {
+        "parameters": {},
+        "name": "Manual Trigger",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [240, 300]
+      },
+      {
+        "parameters": {
+          "path": "/files/{{ $('Manual Trigger').first().json.file_name }}",
+          "binaryPropertyName": "data",
+          "options": {}
+        },
+        "name": "Read File",
+        "type": "n8n-nodes-base.readFile",
+        "typeVersion": 2,
+        "position": [440, 300]
+      },
+      {
+        "parameters": {
+          "url": "http://localhost:5001/v1/convert/file",
+          "method": "POST",
+          "bodyContent": "formData",
+          "formDataContent": [
+            {
+              "parameter": "file",
+              "type": "n8nBinaryFile",
+              "fileName": "document.pdf",
+              "inputDataField": "data"
+            }
+          ],
+          "options": {}
+        },
+        "name": "HTTP Request (Docling)",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4,
+        "position": [640, 300]
+      },
+      {
+        "parameters": {
+          "model": "openai",
+          "operation": "chat",
+          "chatModel": "gpt-4o",
+          "messages": [
+            {
+              "content": "Summarize the key findings from the following document text, focusing on any data points or conclusions mentioned:\n\n{{ $('HTTP Request (Docling)').first().json.text }}",
+              "type": "user"
+            }
+          ],
+          "options": {}
+        },
+        "name": "Chat Model (AI)",
+        "type": "n8n-nodes-base.chatModel",
+        "typeVersion": 1,
+        "position": [840, 300]
+      }
+    ],
+    "connections": {
+      "Manual Trigger": {
+        "main": [
+          [
+            {
+              "node": "Read File",
+              "hopIndex": 0
+            }
+          ]
+        ]
+      },
+      "Read File": {
+        "main": [
+          [
+            {
+              "node": "HTTP Request (Docling)",
+              "hopIndex": 0
+            }
+          ]
+        ]
+      },
+      "HTTP Request (Docling)": {
+        "main": [
+          [
+            {
+              "node": "Chat Model (AI)",
+              "hopIndex": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {}
+  }
 }
