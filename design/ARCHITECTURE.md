@@ -52,7 +52,7 @@
 | React | 18.3.1 | UI framework |
 | TypeScript | 5.6.0 | Type-safe JavaScript |
 | Vite | 5.4.0 | Build tool & dev server |
-| n8n | 1.122.5 | Workflow automation engine (bundled) |
+| n8n | 2.0.0 | Workflow automation engine (bundled) |
 
 ### UI & Styling
 
