@@ -1,14 +1,10 @@
-import { IpcMain } from 'electron';
+import { IpcMain, app } from 'electron';
 import axios, { AxiosRequestConfig } from 'axios';
 import { ConfigManager } from '../config-manager';
 import { N8nAuthManager } from '../services/n8n-auth-manager';
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
-// ESM compatibility for __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export interface WorkflowData {
   id: string;
@@ -42,7 +38,7 @@ const MAX_RECENT = 10;
 
 export function registerWorkflowHandlers(
   ipcMain: IpcMain,
-  configManager: ConfigManager,
+  _configManager: ConfigManager,
   getN8nPort: () => number,
   authManager: N8nAuthManager
 ): void {
@@ -152,24 +148,33 @@ export function registerWorkflowHandlers(
     'workflows:create',
     async (_event, workflow: Partial<WorkflowData>): Promise<WorkflowResult> => {
       try {
+        const workflowData = {
+          name: workflow.name || 'New Workflow',
+          nodes: workflow.nodes || [],
+          connections: workflow.connections || {},
+          settings: workflow.settings || {},
+          active: false,
+        };
+        console.log('Creating workflow with data:', JSON.stringify(workflowData, null, 2));
+
         const response = await axios.post(
           `${getBaseUrl()}/workflows`,
-          {
-            name: workflow.name || 'New Workflow',
-            nodes: workflow.nodes || [],
-            connections: workflow.connections || {},
-            settings: workflow.settings || {},
-            active: false,
-          },
+          workflowData,
           getAuthConfig()
         );
+        // n8n API may wrap response in 'data' property
+        const createdWorkflow = response.data.data || response.data;
+        console.log('Workflow created with ID:', createdWorkflow?.id);
         return {
           success: true,
-          data: response.data,
+          data: createdWorkflow,
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to create workflow';
         console.error('Error creating workflow:', message);
+        if (axios.isAxiosError(error)) {
+          console.error('Response data:', error.response?.data);
+        }
         return { success: false, error: message };
       }
     }
@@ -183,9 +188,11 @@ export function registerWorkflowHandlers(
     async (_event, id: string, updates: Partial<WorkflowData>): Promise<WorkflowResult> => {
       try {
         const response = await axios.patch(`${getBaseUrl()}/workflows/${id}`, updates, getAuthConfig());
+        // n8n API may wrap response in 'data' property
+        const updatedWorkflow = response.data.data || response.data;
         return {
           success: true,
-          data: response.data,
+          data: updatedWorkflow,
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to update workflow';
@@ -257,7 +264,8 @@ export function registerWorkflowHandlers(
     try {
       // Fetch original workflow
       const getResponse = await axios.get(`${getBaseUrl()}/workflows/${id}`, getAuthConfig());
-      const original: WorkflowData = getResponse.data;
+      // n8n API may wrap response in 'data' property
+      const original: WorkflowData = getResponse.data.data || getResponse.data;
 
       // Create copy with timestamp suffix
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -270,9 +278,11 @@ export function registerWorkflowHandlers(
       };
 
       const createResponse = await axios.post(`${getBaseUrl()}/workflows`, newWorkflow, getAuthConfig());
+      // n8n API may wrap response in 'data' property
+      const duplicatedWorkflow = createResponse.data.data || createResponse.data;
       return {
         success: true,
-        data: createResponse.data,
+        data: duplicatedWorkflow,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to duplicate workflow';
@@ -317,7 +327,11 @@ export function registerWorkflowHandlers(
    */
   ipcMain.handle('workflows:getTemplates', async (): Promise<WorkflowTemplate[]> => {
     try {
-      const templatesDir = path.join(__dirname, '../../templates');
+      // Use app.getAppPath() for reliable path resolution in both dev and production
+      const appPath = app.getAppPath();
+      const templatesDir = path.join(appPath, 'templates');
+      console.log('Loading templates from:', templatesDir);
+
       const templateFiles = await fs.readdir(templatesDir);
       const templates: WorkflowTemplate[] = [];
 
@@ -329,9 +343,16 @@ export function registerWorkflowHandlers(
         }
       }
 
-      return templates;
+      console.log(`Loaded ${templates.length} templates from files`);
+
+      // Merge with built-in templates (file templates override built-in ones with same ID)
+      const builtInTemplates = getBuiltInTemplates();
+      const fileTemplateIds = new Set(templates.map(t => t.id));
+      const uniqueBuiltIn = builtInTemplates.filter(t => !fileTemplateIds.has(t.id));
+
+      return [...templates, ...uniqueBuiltIn];
     } catch (error) {
-      console.error('Error loading templates:', error);
+      console.error('Error loading templates from files:', error);
       // Return built-in templates if file loading fails
       return getBuiltInTemplates();
     }
@@ -350,9 +371,9 @@ function getBuiltInTemplates(): WorkflowTemplate[] {
         name: 'AI Chat Assistant',
         nodes: [
           {
-            id: 'trigger',
-            name: 'Manual Trigger',
+            name: 'When clicking "Test workflow"',
             type: 'n8n-nodes-base.manualTrigger',
+            typeVersion: 1,
             position: [250, 300],
             parameters: {},
           },
@@ -370,9 +391,9 @@ function getBuiltInTemplates(): WorkflowTemplate[] {
         name: 'General Automation',
         nodes: [
           {
-            id: 'trigger',
             name: 'Schedule Trigger',
             type: 'n8n-nodes-base.scheduleTrigger',
+            typeVersion: 1.2,
             position: [250, 300],
             parameters: {
               rule: {
@@ -394,9 +415,9 @@ function getBuiltInTemplates(): WorkflowTemplate[] {
         name: 'PDF Processing',
         nodes: [
           {
-            id: 'trigger',
-            name: 'Manual Trigger',
+            name: 'When clicking "Test workflow"',
             type: 'n8n-nodes-base.manualTrigger',
+            typeVersion: 1,
             position: [250, 300],
             parameters: {},
           },

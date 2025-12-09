@@ -1,100 +1,97 @@
 {
-  "id:": "pdf-processing",
+  "id": "pdf-processing",
   "name": "PDF Processing",
-  "description": "Extract and transform document data",
+  "description": "Extract and transform document data with Docling OCR",
   "icon": "file",
   "workflow": {
     "name": "PDF Processing",
     "nodes": [
       {
         "parameters": {},
-        "name": "Manual Trigger",
+        "name": "When clicking 'Test workflow'",
         "type": "n8n-nodes-base.manualTrigger",
         "typeVersion": 1,
         "position": [240, 300]
       },
       {
         "parameters": {
-          "path": "/files/{{ $('Manual Trigger').first().json.file_name }}",
-          "binaryPropertyName": "data",
+          "operation": "readFile",
+          "fileSelector": "={{ $json.file_path }}",
           "options": {}
         },
-        "name": "Read File",
-        "type": "n8n-nodes-base.readFile",
-        "typeVersion": 2,
+        "name": "Read Binary File",
+        "type": "n8n-nodes-base.readWriteFile",
+        "typeVersion": 1,
         "position": [440, 300]
       },
       {
         "parameters": {
           "url": "http://localhost:5001/v1/convert/file",
-          "method": "POST",
-          "bodyContent": "formData",
-          "formDataContent": [
-            {
-              "parameter": "file",
-              "type": "n8nBinaryFile",
-              "fileName": "document.pdf",
-              "inputDataField": "data"
-            }
-          ],
+          "sendBody": true,
+          "contentType": "multipart-form-data",
+          "bodyParameters": {
+            "parameters": [
+              {
+                "parameterType": "formBinaryData",
+                "name": "file",
+                "inputDataFieldName": "data"
+              }
+            ]
+          },
           "options": {}
         },
-        "name": "HTTP Request (Docling)",
+        "name": "Docling OCR",
         "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4,
+        "typeVersion": 4.2,
         "position": [640, 300]
       },
       {
         "parameters": {
-          "model": "openai",
-          "operation": "chat",
-          "chatModel": "gpt-4o",
-          "messages": [
-            {
-              "content": "Summarize the key findings from the following document text, focusing on any data points or conclusions mentioned:\n\n{{ $('HTTP Request (Docling)').first().json.text }}",
-              "type": "user"
-            }
-          ],
-          "options": {}
+          "jsCode": "// Extract the markdown text from the Docling response\nconst response = $input.first().json;\nreturn [{\n  json: {\n    markdown: response.markdown || response.text || '',\n    metadata: response.metadata || {}\n  }\n}];"
         },
-        "name": "Chat Model (AI)",
-        "type": "n8n-nodes-base.chatModel",
-        "typeVersion": 1,
+        "name": "Process Result",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
         "position": [840, 300]
       }
     ],
     "connections": {
-      "Manual Trigger": {
+      "When clicking 'Test workflow'": {
         "main": [
           [
             {
-              "node": "Read File",
-              "hopIndex": 0
+              "node": "Read Binary File",
+              "type": "main",
+              "index": 0
             }
           ]
         ]
       },
-      "Read File": {
+      "Read Binary File": {
         "main": [
           [
             {
-              "node": "HTTP Request (Docling)",
-              "hopIndex": 0
+              "node": "Docling OCR",
+              "type": "main",
+              "index": 0
             }
           ]
         ]
       },
-      "HTTP Request (Docling)": {
+      "Docling OCR": {
         "main": [
           [
             {
-              "node": "Chat Model (AI)",
-              "hopIndex": 0
+              "node": "Process Result",
+              "type": "main",
+              "index": 0
             }
           ]
         ]
       }
     },
-    "settings": {}
+    "settings": {
+      "executionOrder": "v1"
+    }
   }
 }
