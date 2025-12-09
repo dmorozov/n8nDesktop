@@ -1,6 +1,8 @@
-import { FileText, Plus, Upload, MessageSquare, Sparkles, Database } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { FileText, Plus, Upload, MessageSquare, Sparkles, File, LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import type { WorkflowTemplate } from '../../../../../preload/types';
 
 interface EmptyWorkflowsStateProps {
   onCreateNew?: () => void;
@@ -8,39 +10,37 @@ interface EmptyWorkflowsStateProps {
   onSelectTemplate?: (templateId: string) => void;
 }
 
-interface TemplateOption {
-  id: string;
-  name: string;
-  description: string;
-  icon: typeof Sparkles;
-}
-
-const templates: TemplateOption[] = [
-  {
-    id: 'ai-chat',
-    name: 'AI Chat Assistant',
-    description: 'Build a chatbot with OpenAI or Anthropic',
-    icon: MessageSquare,
-  },
-  {
-    id: 'automation',
-    name: 'General Automation',
-    description: 'Connect apps and automate tasks',
-    icon: Sparkles,
-  },
-  {
-    id: 'pdf-processing',
-    name: 'PDF Processing',
-    description: 'Extract and transform document data',
-    icon: Database,
-  },
-];
+// Map icon names from API to Lucide icons
+const iconMap: Record<WorkflowTemplate['icon'], LucideIcon> = {
+  bot: MessageSquare,
+  cog: Sparkles,
+  file: File,
+};
 
 export function EmptyWorkflowsState({
   onCreateNew,
   onImport,
   onSelectTemplate,
 }: EmptyWorkflowsStateProps) {
+  const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadTemplates = async () => {
+      try {
+        const loadedTemplates = await window.electron.workflows.getTemplates();
+        setTemplates(loadedTemplates);
+      } catch (error) {
+        console.error('Failed to load templates:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadTemplates();
+  }, []);
+
+  let idx = 10000;
+
   return (
     <div className="flex flex-col items-center justify-center h-full py-16 px-6">
       {/* Icon */}
@@ -71,35 +71,37 @@ export function EmptyWorkflowsState({
       </div>
 
       {/* Template Options */}
-      <div className="w-full max-w-3xl">
-        <p className="mb-4 text-center text-sm text-muted-foreground">
-          Or start from a template
-        </p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {templates.map((template) => {
-            const Icon = template.icon;
-            return (
-              <Card
-                key={template.id}
-                className="cursor-pointer transition-all hover:border-primary/50 hover:shadow-md"
-                onClick={() => onSelectTemplate?.(template.id)}
-              >
-                <CardContent className="p-4">
-                  <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                    <Icon className="h-4 w-4 text-primary" />
-                  </div>
-                  <h4 className="mb-1 text-sm font-medium text-foreground">
-                    {template.name}
-                  </h4>
-                  <p className="text-xs text-muted-foreground">
-                    {template.description}
-                  </p>
-                </CardContent>
-              </Card>
-            );
-          })}
+      {!loading && templates.length > 0 && (
+        <div className="w-full max-w-3xl">
+          <p className="mb-4 text-center text-sm text-muted-foreground">
+            Or start from a template
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {templates.map((template) => {
+              const Icon = iconMap[template.icon] || File;
+              return (
+                <Card
+                  key={template.id || idx++}
+                  className="cursor-pointer transition-all hover:border-primary/50 hover:shadow-md"
+                  onClick={() => onSelectTemplate?.(template.id)}
+                >
+                  <CardContent className="p-4">
+                    <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                      <Icon className="h-4 w-4 text-primary" />
+                    </div>
+                    <h4 className="mb-1 text-sm font-medium text-foreground">
+                      {template.name}
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      {template.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

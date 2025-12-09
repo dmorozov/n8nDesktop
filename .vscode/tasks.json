@@ -2,25 +2,61 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "electron-forge:start-debug",
-      "type": "shell",
-      "command": "npm run start -- --inspect-electron",
+      "label": "electron-forge: start",
+      "type": "npm",
+      "script": "start",
+      "problemMatcher": [],
       "isBackground": true,
-      "problemMatcher": {
-        "owner": "electron",
-        "pattern": {
-          "regexp": "^$"
-        },
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": "^.*Checking your system.*$",
-          "endsPattern": "^.*Debugger listening on.*$"
-        }
-      },
       "presentation": {
         "reveal": "always",
-        "panel": "dedicated"
+        "panel": "new"
       }
+    },
+    {
+      "label": "electron-forge: start with debug",
+      "type": "shell",
+      "command": "npm",
+      "args": ["run", "start", "--", "--", "--remote-debugging-port=9222"],
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "electron-forge: build",
+      "type": "npm",
+      "script": "build",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "electron-forge: make",
+      "type": "npm",
+      "script": "make",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "typecheck",
+      "type": "npm",
+      "script": "typecheck",
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "lint",
+      "type": "npm",
+      "script": "lint",
+      "problemMatcher": ["$eslint-stylish"]
+    },
+    {
+      "label": "test",
+      "type": "npm",
+      "script": "test",
+      "group": "test",
+      "problemMatcher": []
     }
   ]
 }

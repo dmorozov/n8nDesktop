@@ -1,6 +1,8 @@
 import { Plus, Upload, MessageSquare, Sparkles, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useEffect, useState } from 'react';
+import { WorkflowTemplate } from './NewWorkflowDropdown';
 
 interface CreateWorkflowSectionProps {
   onCreateNew?: () => void;
@@ -8,39 +10,28 @@ interface CreateWorkflowSectionProps {
   onSelectTemplate?: (templateId: string) => void;
 }
 
-interface TemplateOption {
-  id: string;
-  name: string;
-  description: string;
-  icon: typeof Sparkles;
-}
-
-const templates: TemplateOption[] = [
-  {
-    id: 'ai-chat',
-    name: 'AI Chat Assistant',
-    description: 'Build a chatbot with OpenAI or Anthropic',
-    icon: MessageSquare,
-  },
-  {
-    id: 'automation',
-    name: 'General Automation',
-    description: 'Connect apps and automate tasks',
-    icon: Sparkles,
-  },
-  {
-    id: 'pdf-processing',
-    name: 'PDF Processing',
-    description: 'Extract and transform document data',
-    icon: Database,
-  },
-];
-
 export function CreateWorkflowSection({
   onCreateNew,
   onImport,
   onSelectTemplate,
 }: CreateWorkflowSectionProps) {
+  const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+      const loadTemplates = async () => {
+        try {
+          const loadedTemplates = await window.electron.workflows.getTemplates();
+          setTemplates(loadedTemplates);
+        } catch (error) {
+          console.error('Failed to load templates:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      loadTemplates();
+    }, []);
+
   return (
     <div className="space-y-6">
       {/* Primary Actions */}
@@ -56,6 +47,7 @@ export function CreateWorkflowSection({
       </div>
 
       {/* Template Options */}
+      {!loading && templates.length > 0 && (
       <div>
         <h3 className="mb-4 text-sm font-medium text-muted-foreground">
           Or start from a template
@@ -85,6 +77,7 @@ export function CreateWorkflowSection({
           })}
         </div>
       </div>
+      )}
     </div>
   );
 }
