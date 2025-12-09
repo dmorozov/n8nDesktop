@@ -9,19 +9,7 @@
       "isBackground": true,
       "presentation": {
         "reveal": "always",
-        "panel": "new"
-      }
-    },
-    {
-      "label": "electron-forge: start with debug",
-      "type": "shell",
-      "command": "npm",
-      "args": ["run", "start", "--", "--", "--remote-debugging-port=9222"],
-      "problemMatcher": [],
-      "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "new"
+        "panel": "shared"
       }
     },
     {

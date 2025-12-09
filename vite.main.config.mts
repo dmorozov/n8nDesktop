@@ -19,6 +19,7 @@ export default defineConfig({
       ],
     },
     minify: false,
+    sourcemap: true,
   },
   resolve: {
     // Load the Node.js entry.

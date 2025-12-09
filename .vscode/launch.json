@@ -12,6 +12,7 @@
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "sourceMaps": true,
+      "pauseForSourceMap": true,
       "outFiles": [
         "${workspaceFolder}/.vite/build/**/*.js",
         "${workspaceFolder}/.vite/build/**/*.mjs"
@@ -24,18 +25,6 @@
         "<node_internals>/**",
         "**/node_modules/**"
       ]
-    },
-    {
-      "name": "Electron: Renderer Process",
-      "type": "chrome",
-      "request": "attach",
-      "port": 9222,
-      "webRoot": "${workspaceFolder}/src/renderer",
-      "sourceMaps": true,
-      "sourceMapPathOverrides": {
-        "webpack://?:*/*": "${workspaceFolder}/*"
-      },
-      "timeout": 30000
     },
     {
       "name": "Electron: Main + Renderer",
@@ -52,6 +41,7 @@
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "sourceMaps": true,
+      "pauseForSourceMap": true,
       "outFiles": [
         "${workspaceFolder}/.vite/build/**/*.js",
         "${workspaceFolder}/.vite/build/**/*.mjs"
@@ -63,20 +53,19 @@
       "skipFiles": [
         "<node_internals>/**",
         "**/node_modules/**"
-      ],
-      "serverReadyAction": {
-        "pattern": "Vite dev server running at|Dev server started",
-        "action": "startDebugging",
-        "name": "Electron: Renderer Process"
-      }
-    }
-  ],
-  "compounds": [
+      ]
+    },
     {
-      "name": "Electron: Full Debug (Main + Renderer)",
-      "configurations": ["Electron: Main + Renderer"],
-      "stopAll": true,
-      "preLaunchTask": "electron-forge: start with debug"
+      "name": "Electron: Renderer (Attach)",
+      "type": "chrome",
+      "request": "attach",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}/src/renderer",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack://?:*/*": "${workspaceFolder}/*"
+      },
+      "timeout": 30000
     }
   ]
 }
