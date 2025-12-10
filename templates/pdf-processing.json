@@ -11,24 +11,59 @@
         "name": "When clicking 'Test workflow'",
         "type": "n8n-nodes-base.manualTrigger",
         "typeVersion": 1,
-        "position": [240, 304]
+        "position": [240, 300]
       },
       {
         "parameters": {
-          "operation": "readFile",
-          "fileSelector": "={{$json.file_path || '{{N8N_FILES_FOLDER}}/sample.pdf'}}",
-          "options": {}
+          "jsCode": "// Configure the PDF file path to process\n// Replace this with your actual file path, or pass it from a previous node\nconst filePath = '{{N8N_FILES_FOLDER}}/sample.pdf';\n\n// You can also get the file path from input data:\n// const filePath = $input.first().json.file_path;\n\nreturn [{ json: { file_path: filePath } }];"
         },
-        "name": "Read Binary File",
-        "type": "n8n-nodes-base.readWriteFile",
-        "typeVersion": 1,
+        "name": "Set File Path",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
         "position": [440, 300],
         "notesInFlow": true,
-        "notes": "Place your PDF files in the n8n-files folder (Settings > Storage > Workflow Files Folder)"
+        "notes": "Configure your PDF file path here. Files should be in the n8n-files folder."
       },
       {
         "parameters": {
-          "url": "{{DOCLING_API_URL}}/convert/file",
+          "method": "POST",
+          "url": "{{DOCLING_API_URL}}/process",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{DOCLING_AUTH_TOKEN}}"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ file_path: $json.file_path }) }}",
+          "options": {}
+        },
+        "name": "Submit to Docling",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [640, 300]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Extract job_id from Docling response\nconst response = $input.first().json;\nif (!response.job_id) {\n  throw new Error('No job_id returned from Docling');\n}\nreturn [{ json: { job_id: response.job_id, status: response.status } }];"
+        },
+        "name": "Extract Job ID",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [840, 300]
+      },
+      {
+        "parameters": {
+          "method": "GET",
+          "url": "={{\"{{DOCLING_API_URL}}/jobs/\" + $json.job_id}}",
           "sendHeaders": true,
           "headerParameters": {
             "parameters": [
@@ -38,63 +73,141 @@
               }
             ]
           },
-          "sendBody": true,
-          "contentType": "multipart-form-data",
-          "bodyParameters": {
-            "parameters": [
-              {
-                "parameterType": "formBinaryData",
-                "name": "file",
-                "inputDataFieldName": "data"
-              }
-            ]
-          },
           "options": {}
         },
-        "name": "Docling OCR",
+        "name": "Poll Job Status",
         "type": "n8n-nodes-base.httpRequest",
         "typeVersion": 4.2,
-        "position": [640, 300]
+        "position": [1040, 300]
       },
       {
         "parameters": {
-          "jsCode": "// Extract the markdown text from the Docling response\nconst response = $input.first().json;\nreturn [{\n  json: {\n    markdown: response.document?.export_to_markdown || response.markdown || response.text || '',\n    metadata: response.metadata || {},\n    pages: response.document?.pages?.length || 0\n  }\n}];"
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "check-completed",
+                "leftValue": "={{ $json.status }}",
+                "rightValue": "completed",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "or"
+          },
+          "options": {}
+        },
+        "name": "Is Completed?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [1240, 300]
+      },
+      {
+        "parameters": {
+          "amount": 2,
+          "unit": "seconds"
+        },
+        "name": "Wait",
+        "type": "n8n-nodes-base.wait",
+        "typeVersion": 1.1,
+        "position": [1440, 400],
+        "webhookId": "docling-wait"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Extract the markdown result from completed job\nconst job = $input.first().json;\n\nif (job.status === 'failed') {\n  return [{\n    json: {\n      error: 'Processing failed',\n      message: job.error || 'Unknown error',\n      error_type: job.error_type\n    }\n  }];\n}\n\nconst result = job.result || {};\nreturn [{\n  json: {\n    markdown: result.markdown || '',\n    metadata: result.metadata || {},\n    status: result.status,\n    job_id: job.job_id,\n    file_path: job.file_path\n  }\n}];"
         },
         "name": "Process Result",
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
-        "position": [840, 300]
+        "position": [1440, 200]
       }
     ],
-    "pinData": {},
     "connections": {
       "When clicking 'Test workflow'": {
         "main": [
           [
             {
-              "node": "Read Binary File",
+              "node": "Set File Path",
               "type": "main",
               "index": 0
             }
           ]
         ]
       },
-      "Read Binary File": {
+      "Set File Path": {
         "main": [
           [
             {
-              "node": "Docling OCR",
+              "node": "Submit to Docling",
               "type": "main",
               "index": 0
             }
           ]
         ]
       },
-      "Docling OCR": {
+      "Submit to Docling": {
+        "main": [
+          [
+            {
+              "node": "Extract Job ID",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Extract Job ID": {
+        "main": [
+          [
+            {
+              "node": "Poll Job Status",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Poll Job Status": {
+        "main": [
+          [
+            {
+              "node": "Is Completed?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is Completed?": {
         "main": [
           [
             {
               "node": "Process Result",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Wait",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait": {
+        "main": [
+          [
+            {
+              "node": "Poll Job Status",
               "type": "main",
               "index": 0
             }

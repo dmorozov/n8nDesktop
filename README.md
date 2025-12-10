@@ -475,6 +475,7 @@ https://github.com/restyler/awesome-n8n
 Example custom n8n node:
 https://www.npmjs.com/package/n8n-nodes-pdforge
 
+https://n8n.io/integrations/markdown/
 
 ## N8N Templates
 
