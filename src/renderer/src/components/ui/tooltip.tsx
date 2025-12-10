@@ -21,7 +21,7 @@ interface TooltipProps {
 interface TooltipContextValue {
   open: boolean;
   setOpen: (open: boolean) => void;
-  triggerRef: RefObject<HTMLElement>;
+  triggerRef: RefObject<HTMLElement | null>;
   delayDuration: number;
 }
 
@@ -29,7 +29,7 @@ let tooltipContext: TooltipContextValue | null = null;
 
 function Tooltip({ children, open: controlledOpen, onOpenChange, delayDuration = 200 }: TooltipProps) {
   const [internalOpen, setInternalOpen] = useState(false);
-  const triggerRef = useRef<HTMLElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   const open = controlledOpen ?? internalOpen;
   const setOpen = onOpenChange ?? setInternalOpen;
@@ -45,7 +45,7 @@ interface TooltipTriggerProps extends HTMLAttributes<HTMLElement> {
 
 const TooltipTrigger = forwardRef<HTMLElement, TooltipTriggerProps>(
   ({ className, children, asChild: _asChild, ...props }, ref) => {
-    const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+    const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
     const handleMouseEnter = () => {
       if (tooltipContext) {

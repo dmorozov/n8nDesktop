@@ -8,11 +8,14 @@ interface WorkflowListResult {
   error?: string;
 }
 
-interface _WorkflowResult {
+interface WorkflowResult {
   success: boolean;
   data?: Workflow;
   error?: string;
 }
+
+// Export for potential future use
+export type { WorkflowResult };
 
 /**
  * Hook for fetching all workflows

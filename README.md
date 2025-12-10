@@ -474,3 +474,15 @@ https://github.com/restyler/awesome-n8n
 
 Example custom n8n node:
 https://www.npmjs.com/package/n8n-nodes-pdforge
+
+
+## N8N Templates
+
+Added getTemplatePlaceholderValues() function that returns:
+
+- {{DOCLING_API_URL}} - Full API URL (e.g., http://127.0.0.1:8765/api/v1)
+- {{DOCLING_AUTH_TOKEN}} - The auth token from config
+- {{DOCLING_PORT}} - Just the port number
+- {{N8N_FILES_FOLDER}} - Path to the n8n-files folder
+- {{DATA_FOLDER}} - Base data folder path
+- Added replacePlaceholders() function to substit

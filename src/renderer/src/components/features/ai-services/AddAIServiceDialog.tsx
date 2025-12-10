@@ -53,7 +53,8 @@ export function AddAIServiceDialog({
 
   const requiresApiKey = serviceTypeDefaults[type].requiresApiKey;
 
-  const handleTypeChange = (newType: AIServiceType) => {
+  const handleTypeChange = (value: string) => {
+    const newType = value as AIServiceType;
     setType(newType);
     setEndpoint(serviceTypeDefaults[newType].endpoint);
     if (!serviceTypeDefaults[newType].requiresApiKey) {

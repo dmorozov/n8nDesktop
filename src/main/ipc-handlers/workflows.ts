@@ -335,9 +335,14 @@ export function registerWorkflowHandlers(
       const templateFiles = await fs.readdir(templatesDir);
       const templates: WorkflowTemplate[] = [];
 
+      // Get placeholder values
+      const placeholderValues = getTemplatePlaceholderValues(_configManager);
+
       for (const file of templateFiles) {
         if (file.endsWith('.json')) {
-          const content = await fs.readFile(path.join(templatesDir, file), 'utf-8');
+          let content = await fs.readFile(path.join(templatesDir, file), 'utf-8');
+          // Replace placeholders with actual values
+          content = replacePlaceholders(content, placeholderValues);
           const template = JSON.parse(content);
           templates.push(template);
         }
@@ -357,6 +362,33 @@ export function registerWorkflowHandlers(
       return getBuiltInTemplates();
     }
   });
+}
+
+/**
+ * Get placeholder values for template substitution
+ */
+function getTemplatePlaceholderValues(configManager: ConfigManager): Record<string, string> {
+  const dataFolder = configManager.get('dataFolder');
+  const doclingConfig = configManager.getDoclingConfig();
+
+  return {
+    '{{DOCLING_API_URL}}': `http://127.0.0.1:${doclingConfig.port}/api/v1`,
+    '{{DOCLING_AUTH_TOKEN}}': doclingConfig.authToken,
+    '{{DOCLING_PORT}}': doclingConfig.port.toString(),
+    '{{N8N_FILES_FOLDER}}': path.join(dataFolder, 'n8n-files'),
+    '{{DATA_FOLDER}}': dataFolder,
+  };
+}
+
+/**
+ * Replace placeholders in template content with actual values
+ */
+function replacePlaceholders(content: string, values: Record<string, string>): string {
+  let result = content;
+  for (const [placeholder, value] of Object.entries(values)) {
+    result = result.split(placeholder).join(value);
+  }
+  return result;
 }
 
 // Built-in templates (fallback if template files not found)

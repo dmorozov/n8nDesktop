@@ -16,17 +16,28 @@
       {
         "parameters": {
           "operation": "readFile",
-          "fileSelector": "={{ $json.file_path }}",
+          "fileSelector": "={{$json.file_path || '{{N8N_FILES_FOLDER}}/sample.pdf'}}",
           "options": {}
         },
         "name": "Read Binary File",
         "type": "n8n-nodes-base.readWriteFile",
         "typeVersion": 1,
-        "position": [440, 300]
+        "position": [440, 300],
+        "notesInFlow": true,
+        "notes": "Place your PDF files in the n8n-files folder (Settings > Storage > Workflow Files Folder)"
       },
       {
         "parameters": {
-          "url": "http://localhost:5001/v1/convert/file",
+          "url": "{{DOCLING_API_URL}}/convert/file",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{DOCLING_AUTH_TOKEN}}"
+              }
+            ]
+          },
           "sendBody": true,
           "contentType": "multipart-form-data",
           "bodyParameters": {
@@ -47,7 +58,7 @@
       },
       {
         "parameters": {
-          "jsCode": "// Extract the markdown text from the Docling response\nconst response = $input.first().json;\nreturn [{\n  json: {\n    markdown: response.markdown || response.text || '',\n    metadata: response.metadata || {}\n  }\n}];"
+          "jsCode": "// Extract the markdown text from the Docling response\nconst response = $input.first().json;\nreturn [{\n  json: {\n    markdown: response.document?.export_to_markdown || response.markdown || response.text || '',\n    metadata: response.metadata || {},\n    pages: response.document?.pages?.length || 0\n  }\n}];"
         },
         "name": "Process Result",
         "type": "n8n-nodes-base.code",
@@ -55,7 +66,7 @@
         "position": [840, 300]
       }
     ],
-  "pinData": {},
+    "pinData": {},
     "connections": {
       "When clicking 'Test workflow'": {
         "main": [

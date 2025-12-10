@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useRef, useCallback } from 'react';
+import { forwardRef, useEffect, useRef, useCallback, type MouseEvent as ReactMouseEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { type HTMLAttributes, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -24,7 +24,7 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
   }, [open]);
 
   const handleBackdropClick = useCallback(
-    (e: MouseEvent) => {
+    (e: ReactMouseEvent<HTMLDialogElement>) => {
       const dialog = dialogRef.current;
       if (dialog && e.target === dialog) {
         onOpenChange(false);
@@ -34,7 +34,7 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
   );
 
   const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
+    (e: ReactKeyboardEvent<HTMLDialogElement>) => {
       if (e.key === 'Escape') {
         onOpenChange(false);
       }

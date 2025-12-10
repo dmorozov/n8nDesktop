@@ -51,6 +51,8 @@ import {
   refreshTempFolderDiskSpace,
   selectTempFolder,
   refreshDoclingJobs,
+  refreshDoclingStatus,
+  refreshDoclingConfig,
   cancelDoclingJob,
   TIER_DESCRIPTIONS,
   TIMEOUT_ACTION_DESCRIPTIONS,
@@ -81,23 +83,37 @@ export function DoclingSettingsTab({
   const [showAdvancedWarning, setShowAdvancedWarning] = useState(false);
   const [showLogViewer, setShowLogViewer] = useState(false);
 
-  // Check Python availability, disk space, and jobs on mount
+  // Fetch Docling status and config on mount
   useEffect(() => {
+    refreshDoclingStatus();
+    refreshDoclingConfig();
     checkPython();
     refreshTempFolderDiskSpace();
     refreshDoclingJobs();
+  }, []);
 
-    // Set up polling for job status when service is running
-    let intervalId: NodeJS.Timeout | undefined;
+  // Set up polling for status and jobs when service is running
+  useEffect(() => {
+    let statusIntervalId: NodeJS.Timeout | undefined;
+    let jobsIntervalId: NodeJS.Timeout | undefined;
+
     if (doclingStatus.status === 'running') {
-      intervalId = setInterval(() => {
+      // Poll status every 5 seconds to update uptime
+      statusIntervalId = setInterval(() => {
+        refreshDoclingStatus();
+      }, 5000);
+      // Poll jobs every 3 seconds
+      jobsIntervalId = setInterval(() => {
         refreshDoclingJobs();
-      }, 3000); // Poll every 3 seconds
+      }, 3000);
     }
 
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
+      if (statusIntervalId) {
+        clearInterval(statusIntervalId);
+      }
+      if (jobsIntervalId) {
+        clearInterval(jobsIntervalId);
       }
     };
   }, [doclingStatus.status]);
@@ -299,17 +315,17 @@ export function DoclingSettingsTab({
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <Label>Service Status</Label>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {getStatusBadge()}
               {doclingStatus.status === 'running' && (
                 <span className="text-sm text-muted-foreground">
-                  Port {doclingStatus.port}
+                  Port {doclingStatus.port} - Uptime: {formatUptime(doclingStatus.uptime)}
                   {doclingStatus.activeJobs > 0 && (
                     <> - {doclingStatus.activeJobs} active job(s)</>
                   )}
                 </span>
               )}
-              {doclingStatus.error && (
+              {doclingStatus.status === 'error' && doclingStatus.error && (
                 <span className="text-sm text-destructive">
                   {doclingStatus.error}
                 </span>
@@ -493,8 +509,8 @@ export function DoclingSettingsTab({
         <Label htmlFor="processingTier">Processing Tier</Label>
         <Select
           value={currentTier}
-          onValueChange={(value: DoclingConfig['processingTier']) =>
-            updatePendingConfig('processingTier', value)
+          onValueChange={(value) =>
+            updatePendingConfig('processingTier', value as DoclingConfig['processingTier'])
           }
           disabled={isSaving}
         >
@@ -579,8 +595,8 @@ export function DoclingSettingsTab({
         <Label htmlFor="timeoutAction">Timeout Action</Label>
         <Select
           value={currentTimeoutAction}
-          onValueChange={(value: DoclingConfig['timeoutAction']) =>
-            updatePendingConfig('timeoutAction', value)
+          onValueChange={(value) =>
+            updatePendingConfig('timeoutAction', value as DoclingConfig['timeoutAction'])
           }
           disabled={isSaving}
         >
@@ -721,4 +737,12 @@ export function DoclingSettingsTab({
       </div>
     </div>
   );
+}
+
+function formatUptime(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  return `${hours}h ${mins}m`;
 }

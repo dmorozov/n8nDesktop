@@ -126,21 +126,42 @@ export function registerIpcHandlers(
 
     // Handle auto-launch setting
     if (key === 'startWithSystem') {
-      app.setLoginItemSettings({
-        openAtLogin: value as boolean,
-        // On macOS, run hidden when starting at login
-        openAsHidden: process.platform === 'darwin' && (value as boolean),
-      });
+      const boolValue = Boolean(value);
+      try {
+        app.setLoginItemSettings({
+          openAtLogin: boolValue,
+          // On macOS, run hidden when starting at login
+          openAsHidden: process.platform === 'darwin' && boolValue,
+        });
+        console.log(`Set login item settings: openAtLogin=${boolValue}`);
+      } catch (error) {
+        console.error('Failed to set login item settings:', error);
+      }
     }
 
     return { success: true };
   });
 
   /**
-   * Get all config
+   * Get all config - syncs login item state with stored config
    */
   ipcMain.handle('config:getAll', () => {
-    return configManager.getAll();
+    const config = configManager.getAll();
+
+    // Sync login item state with config (in case it was changed externally)
+    try {
+      const loginItemSettings = app.getLoginItemSettings();
+      if (config.startWithSystem !== loginItemSettings.openAtLogin) {
+        // Update config to match actual system state
+        configManager.set('startWithSystem', loginItemSettings.openAtLogin);
+        config.startWithSystem = loginItemSettings.openAtLogin;
+        console.log(`Synced startWithSystem config with system: ${loginItemSettings.openAtLogin}`);
+      }
+    } catch (error) {
+      console.warn('Failed to get login item settings:', error);
+    }
+
+    return config;
   });
 
   /**
@@ -151,10 +172,16 @@ export function registerIpcHandlers(
 
     // Handle auto-launch setting if included
     if ('startWithSystem' in values && values.startWithSystem !== undefined) {
-      app.setLoginItemSettings({
-        openAtLogin: values.startWithSystem,
-        openAsHidden: process.platform === 'darwin' && values.startWithSystem,
-      });
+      const boolValue = Boolean(values.startWithSystem);
+      try {
+        app.setLoginItemSettings({
+          openAtLogin: boolValue,
+          openAsHidden: process.platform === 'darwin' && boolValue,
+        });
+        console.log(`Set login item settings (multiple): openAtLogin=${boolValue}`);
+      } catch (error) {
+        console.error('Failed to set login item settings:', error);
+      }
     }
 
     return { success: true };

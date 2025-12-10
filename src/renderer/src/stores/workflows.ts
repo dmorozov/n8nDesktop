@@ -193,7 +193,7 @@ export function workflowUsesAI(workflow: Workflow): boolean {
     '@n8n/n8n-nodes-langchain',
   ];
 
-  return workflow.nodes.some((node: { type?: string }) =>
+  return (workflow.nodes as Array<{ type?: string }>).some((node) =>
     node.type && aiNodeTypes.some(aiType => node.type?.includes(aiType))
   );
 }

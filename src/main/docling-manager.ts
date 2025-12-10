@@ -5,7 +5,7 @@ import fs from 'fs';
 import os from 'os';
 import { app } from 'electron';
 import { isPortAvailable } from './utils/port-finder';
-import { ConfigManager, DoclingConfig } from './config-manager';
+import { ConfigManager } from './config-manager';
 
 export type DoclingServiceStatus = 'starting' | 'running' | 'stopped' | 'error';
 

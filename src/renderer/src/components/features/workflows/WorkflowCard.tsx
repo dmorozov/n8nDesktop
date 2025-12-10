@@ -188,7 +188,7 @@ function checkForAINodes(workflow: Workflow): boolean {
     'langchain',
   ];
 
-  return workflow.nodes?.some((node: { type?: string }) =>
+  return (workflow.nodes as Array<{ type?: string }> | undefined)?.some((node) =>
     node.type && aiNodeTypes.some((aiType) => node.type?.toLowerCase().includes(aiType.toLowerCase()))
   ) ?? false;
 }

@@ -28,7 +28,7 @@ export function App() {
   // If in sidebar-only mode, render just the MinimizedSidebar
   // This is used when the editor is open - the sidebar is in a separate WebContentsView
   if (isSidebarOnlyMode) {
-    const handleNavigate = (path: string) => {
+    const handleNavigate = (_path: string) => {
       // Close editor and navigate - send message to main window
       closeEditor();
       // Navigation will happen in main window

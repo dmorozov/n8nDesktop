@@ -9,9 +9,10 @@
     "jsx": "react-jsx",
     "jsxImportSource": "react",
     "paths": {
-      "@/*": ["./src/renderer/src/*"]
+      "@/*": ["./src/renderer/src/*"],
+      "@/preload/*": ["./src/preload/*"]
     },
     "baseUrl": "."
   },
-  "include": ["src/renderer/**/*"]
+  "include": ["src/renderer/**/*", "src/preload/types.ts"]
 }
