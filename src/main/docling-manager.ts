@@ -122,6 +122,28 @@ function findDoclingServicePath(): string {
   throw new Error('Docling service not found');
 }
 
+/**
+ * Find the Python executable in the Poetry virtual environment
+ */
+function findVenvPython(servicePath: string): string | null {
+  const isWindows = process.platform === 'win32';
+  const venvPaths = [
+    // Poetry creates .venv in the project directory when virtualenvs.in-project = true
+    path.join(servicePath, '.venv', isWindows ? 'Scripts' : 'bin', isWindows ? 'python.exe' : 'python'),
+    // Check for venv as well
+    path.join(servicePath, 'venv', isWindows ? 'Scripts' : 'bin', isWindows ? 'python.exe' : 'python'),
+  ];
+
+  for (const venvPath of venvPaths) {
+    if (fs.existsSync(venvPath)) {
+      console.log('Found virtual environment Python at:', venvPath);
+      return venvPath;
+    }
+  }
+
+  return null;
+}
+
 export class DoclingManager extends EventEmitter {
   private process: ChildProcess | null = null;
   private configManager: ConfigManager;
@@ -234,12 +256,20 @@ export class DoclingManager extends EventEmitter {
 
     return new Promise((resolve) => {
       try {
-        const pythonCmd = this.pythonInfo.path || 'python3';
         const isWindows = process.platform === 'win32';
+
+        // Prefer virtual environment Python if available
+        const venvPython = findVenvPython(servicePath);
+        const pythonCmd = venvPython || this.pythonInfo.path || 'python3';
 
         this.addLog(`Starting Docling service with: ${pythonCmd}`);
         this.addLog(`Service path: ${servicePath}`);
         this.addLog(`Arguments: ${args.join(' ')}`);
+        if (venvPython) {
+          this.addLog(`Using virtual environment Python`);
+        } else {
+          this.addLog(`Using system Python (run 'npm run setup:docling' to create venv)`);
+        }
 
         this.process = spawn(pythonCmd, args, {
           env,
@@ -269,10 +299,16 @@ export class DoclingManager extends EventEmitter {
           }
         });
 
-        // Handle stderr (structured logs go here)
+        // Handle stderr (structured logs and errors go here)
         this.process.stderr?.on('data', (data: Buffer) => {
           const output = data.toString();
           this.addLog(`[LOG] ${output}`);
+
+          // Check for common Python import errors
+          if (output.includes('ModuleNotFoundError') || output.includes('No module named')) {
+            this.addLog('[ERROR] Missing Python dependencies. Please install requirements:');
+            this.addLog('[ERROR] cd src/docling && pip install -e .');
+          }
         });
 
         // Handle process exit
@@ -282,8 +318,16 @@ export class DoclingManager extends EventEmitter {
           this.process = null;
 
           if (this.status.status === 'starting') {
-            this.updateStatus({ status: 'error', error: `Docling failed to start (exit code: ${code})` });
-            resolve({ success: false, error: `Docling failed to start (exit code: ${code})` });
+            let errorMsg = `Docling failed to start (exit code: ${code})`;
+            if (code === 1) {
+              errorMsg += '. Check logs for details - likely missing Python dependencies.';
+              this.addLog('[ERROR] Startup failed. Common causes:');
+              this.addLog('[ERROR] 1. Missing Python dependencies - run: cd src/docling && pip install -e .');
+              this.addLog('[ERROR] 2. Python version mismatch - requires Python 3.10+');
+              this.addLog('[ERROR] 3. Port already in use');
+            }
+            this.updateStatus({ status: 'error', error: errorMsg });
+            resolve({ success: false, error: errorMsg });
           } else if (this.status.status === 'running') {
             // Unexpected exit - attempt restart
             this.handleUnexpectedExit();

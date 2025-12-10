@@ -694,7 +694,6 @@ export function DoclingSettingsTab({
           variant="outline"
           size="sm"
           onClick={() => setShowLogViewer(true)}
-          disabled={doclingStatus.status !== 'running'}
           data-testid="docling-view-logs-button"
         >
           <FileText className="mr-2 h-4 w-4" />

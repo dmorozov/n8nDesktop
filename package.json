@@ -14,6 +14,7 @@
     "start:debug": "electron-forge start -- --remote-debugging-port=9222",
     "dev": "electron-forge start",
     "build": "electron-forge package",
+    "build:all": "npm run setup:all && npm run build",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint src/",
@@ -25,7 +26,12 @@
     "typecheck:renderer": "tsc --noEmit -p tsconfig.renderer.json",
     "test": "vitest",
     "test:unit": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "setup:all": "npm install && npm run setup:docling",
+    "setup:docling": "cd src/docling && poetry install --no-interaction",
+    "setup:docling:pip": "cd src/docling && pip install -e .",
+    "clean:all": "rm -rf node_modules .vite dist out src/docling/.venv",
+    "check:all": "npm run typecheck && npm run lint && npm run test:unit"
   },
   "dependencies": {
     "@nanostores/react": "^1.0.0",
