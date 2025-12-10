@@ -7,6 +7,7 @@ import { registerStorageHandlers } from './storage';
 import { testConnection, getModels } from '../services/ai-service-tester';
 import { BackupManager } from '../services/backup-manager';
 import { N8nAuthManager } from '../services/n8n-auth-manager';
+import { N8nCredentialSync } from '../services/n8n-credential-sync';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -14,7 +15,8 @@ export function registerIpcHandlers(
   ipcMain: IpcMain,
   n8nManager: N8nManager,
   configManager: ConfigManager,
-  authManager: N8nAuthManager
+  authManager: N8nAuthManager,
+  credentialSync: N8nCredentialSync | null
 ): void {
   // ==================== N8N HANDLERS ====================
 
@@ -29,6 +31,12 @@ export function registerIpcHandlers(
         const ready = await authManager.waitForN8nReady();
         if (ready) {
           await authManager.ensureAuthenticated();
+
+          // Sync AI services to n8n credentials after authentication
+          if (credentialSync) {
+            console.log('Syncing AI services to n8n credentials...');
+            await credentialSync.syncAllServices();
+          }
         }
       } catch (error) {
         console.error('Error setting up n8n auth after start:', error);
@@ -58,6 +66,12 @@ export function registerIpcHandlers(
         const ready = await authManager.waitForN8nReady();
         if (ready) {
           await authManager.ensureAuthenticated();
+
+          // Re-sync AI services after restart
+          if (credentialSync) {
+            console.log('Re-syncing AI services to n8n credentials after restart...');
+            await credentialSync.syncAllServices();
+          }
         }
       } catch (error) {
         console.error('Error setting up n8n auth after restart:', error);
@@ -166,22 +180,60 @@ export function registerIpcHandlers(
   /**
    * Add an AI service
    */
-  ipcMain.handle('config:addAIService', (_event, service: Omit<AIServiceConfig, 'id' | 'createdAt' | 'updatedAt'>) => {
-    return configManager.addAIService(service);
+  ipcMain.handle('config:addAIService', async (_event, service: Omit<AIServiceConfig, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newService = configManager.addAIService(service);
+
+    // Sync to n8n if running
+    if (credentialSync && n8nManager.isRunning()) {
+      try {
+        await credentialSync.onServiceAdded(newService);
+      } catch (error) {
+        console.error('Failed to sync new AI service to n8n:', error);
+      }
+    }
+
+    return newService;
   });
 
   /**
    * Update an AI service
    */
-  ipcMain.handle('config:updateAIService', (_event, id: string, updates: Partial<Omit<AIServiceConfig, 'id' | 'createdAt'>>) => {
-    return configManager.updateAIService(id, updates);
+  ipcMain.handle('config:updateAIService', async (_event, id: string, updates: Partial<Omit<AIServiceConfig, 'id' | 'createdAt'>>) => {
+    const updatedService = configManager.updateAIService(id, updates);
+
+    // Sync to n8n if running
+    if (updatedService && credentialSync && n8nManager.isRunning()) {
+      try {
+        await credentialSync.onServiceUpdated(updatedService);
+      } catch (error) {
+        console.error('Failed to sync updated AI service to n8n:', error);
+      }
+    }
+
+    return updatedService;
   });
 
   /**
    * Delete an AI service
    */
-  ipcMain.handle('config:deleteAIService', (_event, id: string) => {
-    return configManager.deleteAIService(id);
+  ipcMain.handle('config:deleteAIService', async (_event, id: string) => {
+    // Get service name before deleting for the sync
+    const services = configManager.getAIServices();
+    const serviceToDelete = services.find(s => s.id === id);
+    const serviceName = serviceToDelete?.name || '';
+
+    const success = configManager.deleteAIService(id);
+
+    // Sync deletion to n8n if running
+    if (success && credentialSync && n8nManager.isRunning()) {
+      try {
+        await credentialSync.onServiceDeleted(id, serviceName);
+      } catch (error) {
+        console.error('Failed to sync AI service deletion to n8n:', error);
+      }
+    }
+
+    return success;
   });
 
   /**

@@ -9,6 +9,7 @@ import { UpdateChecker } from './services/update-checker';
 import { registerUpdateHandlers } from './ipc-handlers/updates';
 import { registerDoclingHandlers } from './ipc-handlers/docling';
 import { N8nAuthManager } from './services/n8n-auth-manager';
+import { N8nCredentialSync } from './services/n8n-credential-sync';
 
 // ESM compatibility for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -39,6 +40,7 @@ let doclingManager: DoclingManager | null = null;
 let configManager: ConfigManager | null = null;
 let updateChecker: UpdateChecker | null = null;
 let authManager: N8nAuthManager | null = null;
+let credentialSync: N8nCredentialSync | null = null;
 let isEditorVisible = false;
 let isQuitting = false; // Flag to track if we're actually quitting
 
@@ -528,6 +530,9 @@ const initializeApp = async (): Promise<void> => {
   // Initialize auth manager
   authManager = new N8nAuthManager(configManager);
 
+  // Initialize credential sync
+  credentialSync = new N8nCredentialSync(configManager, authManager);
+
   // Initialize update checker
   updateChecker = new UpdateChecker();
 
@@ -536,8 +541,8 @@ const initializeApp = async (): Promise<void> => {
     mainWindow?.webContents.send('n8n:statusChange', status);
   });
 
-  // Register IPC handlers (pass authManager for authenticated API calls)
-  registerIpcHandlers(ipcMain, n8nManager, configManager, authManager);
+  // Register IPC handlers (pass authManager and credentialSync for authenticated API calls)
+  registerIpcHandlers(ipcMain, n8nManager, configManager, authManager, credentialSync);
 
   // Register update handlers
   registerUpdateHandlers(ipcMain, updateChecker, () => mainWindow);
@@ -605,6 +610,18 @@ const setupN8nOwner = async (): Promise<void> => {
     const authenticated = await authManager.ensureAuthenticated();
     if (authenticated) {
       console.log('n8n owner account setup and authentication successful');
+
+      // Sync AI services to n8n credentials
+      if (credentialSync) {
+        console.log('Syncing AI services to n8n credentials...');
+        try {
+          const syncResult = await credentialSync.syncAllServices();
+          console.log(`AI services sync complete: ${syncResult.success} succeeded, ${syncResult.failed} failed`);
+        } catch (syncError) {
+          console.error('Failed to sync AI services to n8n:', syncError);
+        }
+      }
+
       // Notify renderer that n8n is ready
       mainWindow?.webContents.send('n8n:ready', true);
     } else {
