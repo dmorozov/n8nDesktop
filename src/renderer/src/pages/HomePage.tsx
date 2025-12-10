@@ -100,8 +100,8 @@ export function HomePage() {
   };
 
   // Handlers
-  const handleSearchChange = (e: Event) => {
-    const target = e.target as HTMLInputElement;
+  const handleSearchChange = (e: React.FormEvent<HTMLInputElement>) => {
+    const target = e.currentTarget;
     setWorkflowSearch(target.value);
   };
 

@@ -39,6 +39,15 @@ export function registerStorageHandlers(
   });
 
   /**
+   * Get the n8n files folder path (where users should place files for workflow access)
+   * This folder is configured as the allowed path for n8n file operations
+   */
+  ipcMain.handle('storage:getFilesFolder', () => {
+    const dataFolder = configManager.get('dataFolder');
+    return path.join(dataFolder, 'n8n-files');
+  });
+
+  /**
    * Check if data folder is accessible
    * Uses retry logic to handle transient file system issues during startup
    */

@@ -31,8 +31,14 @@ export function StorageSettingsTab({ onSave, isSaving, hasChanges }: StorageSett
   const [isLoadingBackups, setIsLoadingBackups] = useState(false);
   const [isCreatingBackup, setIsCreatingBackup] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [filesFolder, setFilesFolder] = useState<string>('');
 
   const dataFolder = getSetting('dataFolder');
+
+  // Load files folder path on mount
+  useEffect(() => {
+    window.electron.storage.getFilesFolder().then(setFilesFolder);
+  }, [dataFolder]);
 
   // Check if folder can be changed (no workflows running)
   useEffect(() => {
@@ -81,6 +87,12 @@ export function StorageSettingsTab({ onSave, isSaving, hasChanges }: StorageSett
   const handleOpenFolder = async () => {
     if (dataFolder) {
       await window.electron.shell.openPath(dataFolder);
+    }
+  };
+
+  const handleOpenFilesFolder = async () => {
+    if (filesFolder) {
+      await window.electron.shell.openPath(filesFolder);
     }
   };
 
@@ -239,6 +251,31 @@ export function StorageSettingsTab({ onSave, isSaving, hasChanges }: StorageSett
             Open folder in file explorer
           </Button>
         )}
+      </div>
+
+      <Separator />
+
+      {/* Files Folder */}
+      <div className="space-y-2">
+        <Label>Workflow Files Folder</Label>
+        <div className="flex gap-2">
+          <Input
+            value={filesFolder}
+            readOnly
+            className="flex-1 bg-muted"
+          />
+          <Button
+            variant="outline"
+            onClick={handleOpenFilesFolder}
+          >
+            <FolderOpen className="mr-2 h-4 w-4" />
+            Open
+          </Button>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Place files here to access them in your workflows using the "Read Binary File" or "Write Binary File" nodes.
+          For security reasons, n8n can only access files within this folder.
+        </p>
       </div>
 
       <Separator />

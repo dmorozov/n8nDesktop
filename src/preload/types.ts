@@ -401,6 +401,7 @@ export interface ElectronAPI {
     getDataFolder: () => Promise<string>;
     checkDataFolder: () => Promise<DataFolderStatus>;
     selectDataFolder: () => Promise<DialogResult>;
+    getFilesFolder: () => Promise<string>;
     getStats: () => Promise<{ success: boolean; stats?: StorageStats; error?: string }>;
     clearCache: () => Promise<SimpleResult>;
     canChangeDataFolder: () => Promise<boolean>;

@@ -130,6 +130,12 @@ export class N8nManager extends EventEmitter {
       fs.mkdirSync(n8nFolder, { recursive: true });
     }
 
+    // Create n8n-files folder for user file access (used by Read/Write Binary File nodes)
+    const n8nFilesFolder = path.join(dataFolder, 'n8n-files');
+    if (!fs.existsSync(n8nFilesFolder)) {
+      fs.mkdirSync(n8nFilesFolder, { recursive: true });
+    }
+
     // Get Docling configuration for environment variables
     const doclingConfig = this.configManager.getDoclingConfig();
 
@@ -147,6 +153,10 @@ export class N8nManager extends EventEmitter {
       N8N_TEMPLATES_ENABLED: 'false',
       // Disable external connections for security
       N8N_HIRING_BANNER_ENABLED: 'false',
+      // File access restrictions - allow access to n8n-files folder
+      // Users should place files in the n8n-files folder within their data folder
+      // Note: Using semicolon as separator due to known issue with colon separator in n8n
+      N8N_RESTRICT_FILE_ACCESS_TO: n8nFilesFolder,
       // Docling service configuration for n8n workflows to use
       DOCLING_API_URL: `http://127.0.0.1:${doclingConfig.port}/api/v1`,
       DOCLING_API_PORT: doclingConfig.port.toString(),
@@ -347,6 +357,14 @@ export class N8nManager extends EventEmitter {
       return null;
     }
     return `http://localhost:${this.status.port}`;
+  }
+
+  /**
+   * Get the n8n files folder path where users can place files for workflow access
+   */
+  getFilesFolder(): string {
+    const dataFolder = this.configManager.get('dataFolder');
+    return path.join(dataFolder, 'n8n-files');
   }
 
   /**

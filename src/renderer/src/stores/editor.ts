@@ -1,4 +1,5 @@
 import { atom } from 'nanostores';
+import { loadWorkflows } from './workflows';
 
 // Track whether the n8n editor WebContentsView is currently visible
 export const $editorVisible = atom<boolean>(false);
@@ -19,7 +20,13 @@ export function initEditorVisibilitySubscription(): () => void {
 
   // Subscribe to visibility changes
   const unsubscribe = window.electron.editor.onVisibilityChange((visible) => {
+    const wasVisible = $editorVisible.get();
     $editorVisible.set(visible);
+
+    // Reload workflows when editor is closed to sync any changes made in the editor
+    if (wasVisible && !visible) {
+      loadWorkflows();
+    }
   });
 
   // Poll for visibility state periodically to handle any missed events

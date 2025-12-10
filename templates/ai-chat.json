@@ -11,7 +11,10 @@
         "name": "When clicking 'Test workflow'",
         "type": "n8n-nodes-base.manualTrigger",
         "typeVersion": 1,
-        "position": [240, 300]
+        "position": [
+          240,
+          304
+        ]
       },
       {
         "parameters": {
@@ -20,7 +23,7 @@
               {
                 "id": "prompt-input",
                 "name": "chatInput",
-                "value": "Hello! What can you help me with today?",
+                "value": "Please tell me a joke",
                 "type": "string"
               }
             ]
@@ -30,7 +33,10 @@
         "name": "User Prompt",
         "type": "n8n-nodes-base.set",
         "typeVersion": 3.4,
-        "position": [460, 300]
+        "position": [
+          464,
+          304
+        ]
       },
       {
         "parameters": {
@@ -39,7 +45,10 @@
         "name": "AI Agent",
         "type": "@n8n/n8n-nodes-langchain.agent",
         "typeVersion": 1.7,
-        "position": [680, 300]
+        "position": [
+          688,
+          224
+        ]
       },
       {
         "parameters": {
@@ -58,9 +67,13 @@
         "name": "Show Result",
         "type": "n8n-nodes-base.set",
         "typeVersion": 3.4,
-        "position": [900, 300]
+        "position": [
+          1024,
+          256
+        ]
       }
     ],
+    "pinData": {},
     "connections": {
       "When clicking 'Test workflow'": {
         "main": [

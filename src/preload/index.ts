@@ -104,6 +104,7 @@ const electronAPI: ElectronAPI = {
     getDataFolder: () => ipcRenderer.invoke('storage:getDataFolder'),
     checkDataFolder: () => ipcRenderer.invoke('storage:checkDataFolder'),
     selectDataFolder: () => ipcRenderer.invoke('storage:selectDataFolder'),
+    getFilesFolder: () => ipcRenderer.invoke('storage:getFilesFolder'),
     getStats: () => ipcRenderer.invoke('storage:getStats'),
     clearCache: () => ipcRenderer.invoke('storage:clearCache'),
     canChangeDataFolder: () => ipcRenderer.invoke('storage:canChangeDataFolder'),

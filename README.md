@@ -454,3 +454,12 @@ Create a subdirectory named local_files in your n8n-granite-project folder. Plac
   2. Wait for the app to fully start
   3. In VS Code, select "Electron: Renderer (Attach)" → Press F5
   4. Now you can use DevTools (F12) for renderer and console.log for main
+
+## N8N custom nodes
+
+http://n8nhackers.com/
+https://ncnodes.com/
+https://github.com/restyler/awesome-n8n
+
+Example custom n8n node:
+https://www.npmjs.com/package/n8n-nodes-pdforge
