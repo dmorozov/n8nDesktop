@@ -13,6 +13,7 @@ import {
   isBridgeUnavailableError,
 } from '../../lib/bridge-client';
 import { DEFAULT_CONFIG, FILE_FILTER_PRESETS } from '../../lib/types';
+import type { IFileReference } from '../../lib/types';
 
 /**
  * Build file filters based on filter type selection
@@ -50,20 +51,81 @@ export class FileSelector implements INodeType {
     icon: 'file:fileSelector.svg',
     group: ['input'],
     version: 1,
-    subtitle: 'Select and import local files',
-    description: 'Select files from the local filesystem using a native file dialog. Files are copied to the n8n data folder for workflow access.',
+    subtitle: '={{$parameter["operation"]}}',
+    description: 'Select and manage local files. Files are stored in the node and output when the workflow runs.',
     defaults: {
       name: 'File Selector',
     },
     inputs: ['main'],
     outputs: ['main'],
     properties: [
+      // Operation mode
+      {
+        displayName: 'Operation',
+        name: 'operation',
+        type: 'options',
+        noDataExpression: true,
+        options: [
+          {
+            name: 'Use Stored Files',
+            value: 'useStored',
+            description: 'Output the files that are already stored in this node',
+            action: 'Output stored files',
+          },
+          {
+            name: 'Select New Files',
+            value: 'selectNew',
+            description: 'Open a file dialog to select new files (replaces stored files)',
+            action: 'Open file dialog and select new files',
+          },
+          {
+            name: 'Add More Files',
+            value: 'addMore',
+            description: 'Open a file dialog to add files to the existing list',
+            action: 'Open file dialog and add to stored files',
+          },
+          {
+            name: 'Clear All Files',
+            value: 'clear',
+            description: 'Remove all stored files',
+            action: 'Clear all stored files',
+          },
+        ],
+        default: 'useStored',
+        description: 'Choose whether to use stored files or select new ones',
+      },
+      // Notice about stored files
+      {
+        displayName: 'This node stores files persistently. Run the workflow with "Select New Files" to pick files, then switch back to "Use Stored Files" for subsequent runs.',
+        name: 'notice',
+        type: 'notice',
+        default: '',
+      },
+      // Stored files display (read-only JSON view)
+      {
+        displayName: 'Stored Files',
+        name: 'storedFilesDisplay',
+        type: 'json',
+        default: '[]',
+        description: 'Files currently stored in this node (read-only view, updated when you select files)',
+        displayOptions: {
+          show: {
+            operation: ['useStored'],
+          },
+        },
+      },
+      // File selection options (shown when selecting files)
       {
         displayName: 'Dialog Title',
         name: 'dialogTitle',
         type: 'string',
         default: DEFAULT_CONFIG.fileSelector.dialogTitle,
         description: 'Title shown in the file selection dialog',
+        displayOptions: {
+          show: {
+            operation: ['selectNew', 'addMore'],
+          },
+        },
       },
       {
         displayName: 'File Type Filter',
@@ -98,6 +160,11 @@ export class FileSelector implements INodeType {
         ],
         default: 'all',
         description: 'Filter which file types can be selected',
+        displayOptions: {
+          show: {
+            operation: ['selectNew', 'addMore'],
+          },
+        },
       },
       {
         displayName: 'Custom Extensions',
@@ -108,6 +175,7 @@ export class FileSelector implements INodeType {
         description: 'Comma-separated list of file extensions (without dots)',
         displayOptions: {
           show: {
+            operation: ['selectNew', 'addMore'],
             fileTypeFilter: ['custom'],
           },
         },
@@ -118,6 +186,11 @@ export class FileSelector implements INodeType {
         type: 'boolean',
         default: DEFAULT_CONFIG.fileSelector.allowMultiple,
         description: 'Whether to allow selecting multiple files at once',
+        displayOptions: {
+          show: {
+            operation: ['selectNew', 'addMore'],
+          },
+        },
       },
       {
         displayName: 'Duplicate Handling',
@@ -142,6 +215,11 @@ export class FileSelector implements INodeType {
         ],
         default: DEFAULT_CONFIG.fileSelector.duplicateHandling,
         description: 'How to handle files that already exist in the destination',
+        displayOptions: {
+          show: {
+            operation: ['selectNew', 'addMore'],
+          },
+        },
       },
       {
         displayName: 'Destination Subfolder',
@@ -149,6 +227,11 @@ export class FileSelector implements INodeType {
         type: 'string',
         default: DEFAULT_CONFIG.fileSelector.destinationSubfolder,
         description: 'Subfolder within the data folder where files will be copied',
+        displayOptions: {
+          show: {
+            operation: ['selectNew', 'addMore'],
+          },
+        },
       },
     ],
   };
@@ -157,83 +240,133 @@ export class FileSelector implements INodeType {
     const items = this.getInputData();
     const returnData: INodeExecutionData[] = [];
 
-    // Check if bridge is available
-    const bridgeAvailable = await isBridgeAvailable();
-    if (!bridgeAvailable) {
-      throw new NodeOperationError(
-        this.getNode(),
-        'Electron bridge is not available. This node requires the n8n Desktop application.',
-        { description: 'The File Selector node uses native OS dialogs which are only available in the n8n Desktop application.' }
-      );
-    }
+    // Get static data for persisting files across executions
+    const staticData = this.getWorkflowStaticData('node');
 
     for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
       try {
-        // Get parameters
-        const dialogTitle = this.getNodeParameter('dialogTitle', itemIndex, DEFAULT_CONFIG.fileSelector.dialogTitle) as string;
-        const fileTypeFilter = this.getNodeParameter('fileTypeFilter', itemIndex, 'all') as string;
-        const customExtensions = this.getNodeParameter('customExtensions', itemIndex, '') as string;
-        const allowMultiple = this.getNodeParameter('allowMultiple', itemIndex, DEFAULT_CONFIG.fileSelector.allowMultiple) as boolean;
-        const duplicateHandling = this.getNodeParameter('duplicateHandling', itemIndex, DEFAULT_CONFIG.fileSelector.duplicateHandling) as 'rename' | 'skip' | 'overwrite';
-        const destinationSubfolder = this.getNodeParameter('destinationSubfolder', itemIndex, DEFAULT_CONFIG.fileSelector.destinationSubfolder) as string;
+        const operation = this.getNodeParameter('operation', itemIndex) as string;
 
-        // Build file filters
-        const filters = buildFileFilters(fileTypeFilter, customExtensions);
+        // Get stored files from static data
+        let storedFiles: IFileReference[] = (staticData.files as IFileReference[]) || [];
 
-        // Open file selection dialog
-        const selectResult = await selectFiles({
-          title: dialogTitle,
-          filters,
-          multiSelect: allowMultiple,
-        });
-
-        // Handle cancellation
-        if (selectResult.cancelled || selectResult.selectedPaths.length === 0) {
+        if (operation === 'useStored') {
+          // Just output the stored files
           const output: IDataObject = {
-            success: false,
-            cancelled: true,
-            fileCount: 0,
-            files: [],
-            totalSize: 0,
+            success: true,
+            operation: 'useStored',
+            fileCount: storedFiles.length,
+            files: storedFiles,
+            totalSize: storedFiles.reduce((sum, f) => sum + (f.size || 0), 0),
           };
+
           returnData.push({
             json: output,
             pairedItem: { item: itemIndex },
           });
-          continue;
+        } else if (operation === 'selectNew' || operation === 'addMore') {
+          // Check if bridge is available
+          const bridgeAvailable = await isBridgeAvailable();
+          if (!bridgeAvailable) {
+            throw new NodeOperationError(
+              this.getNode(),
+              'Electron bridge is not available. This node requires the n8n Desktop application.',
+              { description: 'The File Selector node uses native OS dialogs which are only available in the n8n Desktop application.' }
+            );
+          }
+
+          // Get selection parameters
+          const dialogTitle = this.getNodeParameter('dialogTitle', itemIndex, DEFAULT_CONFIG.fileSelector.dialogTitle) as string;
+          const fileTypeFilter = this.getNodeParameter('fileTypeFilter', itemIndex, 'all') as string;
+          const customExtensions = this.getNodeParameter('customExtensions', itemIndex, '') as string;
+          const allowMultiple = this.getNodeParameter('allowMultiple', itemIndex, DEFAULT_CONFIG.fileSelector.allowMultiple) as boolean;
+          const duplicateHandling = this.getNodeParameter('duplicateHandling', itemIndex, DEFAULT_CONFIG.fileSelector.duplicateHandling) as 'rename' | 'skip' | 'overwrite';
+          const destinationSubfolder = this.getNodeParameter('destinationSubfolder', itemIndex, DEFAULT_CONFIG.fileSelector.destinationSubfolder) as string;
+
+          // Build file filters
+          const filters = buildFileFilters(fileTypeFilter, customExtensions);
+
+          // Open file selection dialog
+          const selectResult = await selectFiles({
+            title: dialogTitle,
+            filters,
+            multiSelect: allowMultiple,
+          });
+
+          // Handle cancellation
+          if (selectResult.cancelled || selectResult.selectedPaths.length === 0) {
+            const output: IDataObject = {
+              success: false,
+              operation,
+              cancelled: true,
+              fileCount: storedFiles.length,
+              files: storedFiles,
+              message: 'File selection was cancelled. Stored files unchanged.',
+            };
+            returnData.push({
+              json: output,
+              pairedItem: { item: itemIndex },
+            });
+            continue;
+          }
+
+          // Copy selected files to data folder
+          const copyResult = await copyFiles({
+            files: selectResult.selectedPaths.map((sourcePath) => ({ sourcePath })),
+            destinationSubfolder,
+            duplicateHandling,
+          });
+
+          // Update stored files based on operation
+          if (operation === 'selectNew') {
+            // Replace all files
+            storedFiles = copyResult.copiedFiles;
+          } else {
+            // Add to existing files (avoid duplicates by path)
+            const existingPaths = new Set(storedFiles.map(f => f.destinationPath));
+            const newFiles = copyResult.copiedFiles.filter(f => !existingPaths.has(f.destinationPath));
+            storedFiles = [...storedFiles, ...newFiles];
+          }
+
+          // Persist to static data
+          staticData.files = storedFiles;
+
+          // Build output
+          const output: IDataObject = {
+            success: copyResult.success,
+            operation,
+            cancelled: false,
+            fileCount: storedFiles.length,
+            files: storedFiles,
+            newFilesAdded: copyResult.copiedFiles.length,
+            skippedFiles: copyResult.skippedFiles,
+            totalSize: storedFiles.reduce((sum, f) => sum + (f.size || 0), 0),
+            message: `${copyResult.copiedFiles.length} file(s) added. Total: ${storedFiles.length} file(s) stored.`,
+          };
+
+          returnData.push({
+            json: output,
+            pairedItem: { item: itemIndex },
+          });
+        } else if (operation === 'clear') {
+          // Clear all stored files
+          storedFiles = [];
+          staticData.files = storedFiles;
+
+          const output: IDataObject = {
+            success: true,
+            operation: 'clear',
+            fileCount: 0,
+            files: [],
+            totalSize: 0,
+            message: 'All stored files have been cleared.',
+          };
+
+          returnData.push({
+            json: output,
+            pairedItem: { item: itemIndex },
+          });
         }
-
-        // Copy selected files to data folder
-        const copyResult = await copyFiles({
-          files: selectResult.selectedPaths.map((sourcePath) => ({ sourcePath })),
-          destinationSubfolder,
-          duplicateHandling,
-        });
-
-        // Build output with file references
-        const output: IDataObject = {
-          success: copyResult.success,
-          cancelled: false,
-          fileCount: copyResult.copiedFiles.length,
-          files: copyResult.copiedFiles.map((file) => ({
-            id: file.id,
-            originalName: file.originalName,
-            originalPath: file.originalPath,
-            destinationPath: file.destinationPath,
-            size: file.size,
-            mimeType: file.mimeType,
-            extension: file.extension,
-            copiedAt: file.copiedAt,
-            hash: file.hash,
-          })),
-          skippedFiles: copyResult.skippedFiles,
-          totalSize: copyResult.totalSize,
-        };
-
-        returnData.push({
-          json: output,
-          pairedItem: { item: itemIndex },
-        });
       } catch (error) {
         if (isBridgeUnavailableError(error)) {
           throw new NodeOperationError(
@@ -244,12 +377,12 @@ export class FileSelector implements INodeType {
         }
 
         if (this.continueOnFail()) {
+          const storedFiles = (staticData.files as IFileReference[]) || [];
           const errorOutput: IDataObject = {
             success: false,
-            cancelled: false,
-            fileCount: 0,
-            files: [],
-            totalSize: 0,
+            operation: 'error',
+            fileCount: storedFiles.length,
+            files: storedFiles,
             error: (error as Error).message,
           };
           returnData.push({
