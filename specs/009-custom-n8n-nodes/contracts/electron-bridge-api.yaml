@@ -13,8 +13,8 @@ servers:
     description: Local Electron Bridge Server
     variables:
       port:
-        default: '5679'
-        description: Electron bridge port (configurable)
+        default: '5680'
+        description: Electron bridge port (configurable, 5679 is reserved for n8n Task Broker)
 
 paths:
   /health:

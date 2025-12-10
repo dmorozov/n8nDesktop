@@ -10,6 +10,7 @@ import { registerUpdateHandlers } from './ipc-handlers/updates';
 import { registerDoclingHandlers } from './ipc-handlers/docling';
 import { N8nAuthManager } from './services/n8n-auth-manager';
 import { N8nCredentialSync } from './services/n8n-credential-sync';
+import { startElectronBridge, stopElectronBridge } from './services/electron-bridge';
 
 // ESM compatibility for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -492,7 +493,14 @@ const gracefulShutdown = async (): Promise<void> => {
     }
   }
 
-  // Stop Docling service first (it's faster)
+  // Stop Electron bridge first (it's fastest)
+  try {
+    await stopElectronBridge();
+  } catch (error) {
+    console.error('Error stopping Electron bridge:', error);
+  }
+
+  // Stop Docling service (it's faster than n8n)
   if (doclingManager?.isRunning()) {
     try {
       await doclingManager.stop();
@@ -555,6 +563,14 @@ const initializeApp = async (): Promise<void> => {
 
   // Create system tray
   createTray();
+
+  // Start Electron bridge for custom n8n nodes
+  try {
+    const bridgePort = await startElectronBridge(configManager);
+    console.log(`Electron bridge started on port ${bridgePort}`);
+  } catch (error) {
+    console.error('Failed to start Electron bridge:', error);
+  }
 
   // Start n8n server if not first run
   if (configManager.get('firstRunComplete')) {

@@ -258,39 +258,7 @@ export interface IElectronBridgeDataFolderResponse {
 }
 
 // ============================================================
-// n8n Node Type Extensions
-// ============================================================
-
-/**
- * Extended node properties for custom nodes
- */
-export interface ICustomNodeProperties {
-  /** Electron bridge URL for IPC communication */
-  electronBridgeUrl: string;
-
-  /** Request timeout in milliseconds */
-  requestTimeout: number;
-}
-
-/**
- * Node execution context extension
- */
-export interface ICustomExecutionContext {
-  /** Get the Electron bridge URL from environment */
-  getElectronBridgeUrl(): string;
-
-  /** Get the n8n data folder path */
-  getDataFolder(): Promise<string>;
-
-  /** Select files via native dialog */
-  selectFiles(options: IElectronBridgeSelectFilesRequest): Promise<IElectronBridgeSelectFilesResponse>;
-
-  /** Copy files to data folder */
-  copyFiles(options: IElectronBridgeCopyFilesRequest): Promise<IElectronBridgeCopyFilesResponse>;
-}
-
-// ============================================================
-// Utility Types
+// Utility Types and Constants
 // ============================================================
 
 /**
@@ -309,7 +277,7 @@ export type SupportedMimeType =
   | 'image/jpeg'
   | 'image/gif'
   | 'image/webp'
-  | string; // Allow other MIME types
+  | string;
 
 /**
  * File filter presets for common use cases
@@ -338,7 +306,7 @@ export const FILE_FILTER_PRESETS = {
  */
 export const DEFAULT_CONFIG = {
   fileSelector: {
-    allowedExtensions: [],
+    allowedExtensions: [] as string[],
     allowMultiple: true,
     dialogTitle: 'Select Files',
     duplicateHandling: 'rename' as const,

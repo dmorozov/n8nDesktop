@@ -332,7 +332,8 @@ import http from 'http';
 import { dialog } from 'electron';
 import { configManager } from '../config-manager';
 
-const BRIDGE_PORT = 5679;
+// Note: Port 5679 is reserved for n8n Task Broker, so we use 5680
+const BRIDGE_PORT = 5680;
 
 export function startElectronBridge() {
   const server = http.createServer(async (req, res) => {
@@ -408,7 +409,7 @@ app.whenReady().then(async () => {
 ### Bridge Connection Fails
 
 1. Verify Electron bridge is running (check console)
-2. Ensure port 5679 is not in use
+2. Ensure port 5680 is not in use (port 5679 is reserved for n8n Task Broker)
 3. Check CORS headers if testing from browser
 
 ---

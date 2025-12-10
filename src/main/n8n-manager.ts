@@ -5,6 +5,7 @@ import fs from 'fs';
 import { app } from 'electron';
 import { isPortAvailable } from './utils/port-finder';
 import { ConfigManager } from './config-manager';
+import { getElectronBridgeUrl } from './services/electron-bridge';
 
 export interface N8nStatus {
   status: 'starting' | 'running' | 'stopped' | 'error';
@@ -79,6 +80,54 @@ function findN8nBinary(): string {
   return 'npx';
 }
 
+/**
+ * Find the path to the custom n8n nodes directory.
+ * In development, it's in src/n8n_nodes/dist/
+ * In production (packaged app), it's in resources/app.asar.unpacked/src/n8n_nodes/dist/
+ */
+function findCustomNodesPath(): string | null {
+  const isPackaged = app.isPackaged;
+
+  // Possible locations for custom nodes
+  const possiblePaths: string[] = [];
+
+  if (isPackaged) {
+    // In production, check unpacked resources
+    const resourcesPath = process.resourcesPath;
+    possiblePaths.push(
+      path.join(resourcesPath, 'app.asar.unpacked', 'src', 'n8n_nodes', 'dist'),
+      path.join(resourcesPath, 'app.asar.unpacked', 'src', 'n8n_nodes'),
+      path.join(resourcesPath, 'app', 'src', 'n8n_nodes', 'dist'),
+      path.join(resourcesPath, 'app', 'src', 'n8n_nodes'),
+    );
+  } else {
+    // In development, app.getAppPath() returns the project root
+    // Note: In Vite dev mode, this might return .vite/build, so we need to check parent directories too
+    const appPath = app.getAppPath();
+    possiblePaths.push(
+      path.join(appPath, 'src', 'n8n_nodes', 'dist'),
+      path.join(appPath, 'src', 'n8n_nodes'),
+      // Fallback for Vite dev mode where appPath might be .vite/build
+      path.join(appPath, '..', '..', 'src', 'n8n_nodes', 'dist'),
+      path.join(appPath, '..', '..', 'src', 'n8n_nodes'),
+      path.join(appPath, '..', '..', '..', 'src', 'n8n_nodes', 'dist'),
+      path.join(appPath, '..', '..', '..', 'src', 'n8n_nodes'),
+    );
+  }
+
+  // Find the first existing path that contains a package.json
+  for (const nodesPath of possiblePaths) {
+    const packageJsonPath = path.join(nodesPath, 'package.json');
+    if (fs.existsSync(packageJsonPath)) {
+      console.log('Found custom n8n nodes at:', nodesPath);
+      return nodesPath;
+    }
+  }
+
+  console.warn('Custom n8n nodes not found. Searched:', possiblePaths);
+  return null;
+}
+
 export class N8nManager extends EventEmitter {
   private process: ChildProcess | null = null;
   private configManager: ConfigManager;
@@ -139,6 +188,14 @@ export class N8nManager extends EventEmitter {
     // Get Docling configuration for environment variables
     const doclingConfig = this.configManager.getDoclingConfig();
 
+    // Find custom n8n nodes path
+    const customNodesPath = findCustomNodesPath();
+    if (customNodesPath) {
+      this.addLog(`Custom n8n nodes found at: ${customNodesPath}`);
+    } else {
+      this.addLog('Warning: Custom n8n nodes not found');
+    }
+
     // Environment variables for n8n
     const env: NodeJS.ProcessEnv = {
       ...process.env,
@@ -162,6 +219,10 @@ export class N8nManager extends EventEmitter {
       DOCLING_API_PORT: doclingConfig.port.toString(),
       DOCLING_AUTH_TOKEN: doclingConfig.authToken,
       DOCLING_ENABLED: doclingConfig.enabled ? 'true' : 'false',
+      // Electron bridge URL for custom n8n nodes to communicate with main process
+      ELECTRON_BRIDGE_URL: getElectronBridgeUrl(),
+      // Custom n8n nodes path for n8n to load desktop-specific nodes
+      ...(customNodesPath ? { N8N_CUSTOM_EXTENSIONS: customNodesPath } : {}),
     };
 
     return new Promise((resolve) => {

@@ -7,6 +7,12 @@
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
+**Phase Reordering Note**: Task phases differ from plan.md ordering for MVP optimization:
+- US4 (Build Integration) moved to Phase 3 to validate the build pipeline early
+- US2 (PromptInput) moved to Phase 4 as the simplest node to implement first
+- US1 (FileSelector) in Phase 5 after bridge infrastructure is ready
+- This allows faster validation of the core architecture before complex IPC work
+
 ## Format: `[ID] [P?] [Story?] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
@@ -25,13 +31,13 @@
 
 **Purpose**: Initialize the n8n_nodes sub-project with proper build infrastructure
 
-- [ ] T001 Create directory structure: `src/n8n_nodes/`, `src/n8n_nodes/nodes/`, `src/n8n_nodes/lib/`
-- [ ] T002 Create package.json with n8n configuration in `src/n8n_nodes/package.json`
-- [ ] T003 [P] Create TypeScript config in `src/n8n_nodes/tsconfig.json`
-- [ ] T004 [P] Create ESLint flat config in `src/n8n_nodes/eslint.config.mjs`
-- [ ] T005 [P] Copy shared type interfaces from contracts to `src/n8n_nodes/lib/types.ts`
-- [ ] T006 Add n8n_nodes scripts to root `package.json` (setup:n8n-nodes, build:n8n-nodes)
-- [ ] T007 Verify sub-project builds successfully with `npm run build:n8n-nodes`
+- [x] T001 Create directory structure: `src/n8n_nodes/`, `src/n8n_nodes/nodes/`, `src/n8n_nodes/lib/`
+- [x] T002 Create package.json with n8n configuration in `src/n8n_nodes/package.json`
+- [x] T003 [P] Create TypeScript config in `src/n8n_nodes/tsconfig.json`
+- [x] T004 [P] Create ESLint flat config in `src/n8n_nodes/eslint.config.mjs`
+- [x] T005 [P] Copy shared type interfaces from contracts to `src/n8n_nodes/lib/types.ts`
+- [x] T006 Add n8n_nodes scripts to root `package.json` (setup:n8n-nodes, build:n8n-nodes)
+- [x] T007 Verify sub-project builds successfully with `npm run build:n8n-nodes`
 
 ---
 
@@ -41,14 +47,14 @@
 
 **⚠️ CRITICAL**: FileSelector (US1) cannot work without this bridge
 
-- [ ] T008 Create Electron bridge server module in `src/main/services/electron-bridge.ts`
-- [ ] T009 [P] Implement health check endpoint `/api/electron-bridge/health` in `src/main/services/electron-bridge.ts`
-- [ ] T010 Implement file selection endpoint `/api/electron-bridge/files/select` in `src/main/services/electron-bridge.ts`
-- [ ] T011 Implement file copy endpoint `/api/electron-bridge/files/copy` in `src/main/services/electron-bridge.ts`
-- [ ] T012 [P] Implement data folder endpoint `/api/electron-bridge/config/data-folder` in `src/main/services/electron-bridge.ts`
-- [ ] T013 Add bridge startup to Electron app initialization in `src/main/index.ts`
-- [ ] T014 Create bridge client library in `src/n8n_nodes/lib/bridge-client.ts`
-- [ ] T015 Add ELECTRON_BRIDGE_URL environment variable to n8n spawn config in `src/main/n8n-manager.ts`
+- [x] T008 Create Electron bridge server module in `src/main/services/electron-bridge.ts`
+- [x] T009 [P] Implement health check endpoint `/api/electron-bridge/health` in `src/main/services/electron-bridge.ts`
+- [x] T010 Implement file selection endpoint `/api/electron-bridge/files/select` in `src/main/services/electron-bridge.ts`
+- [x] T011 Implement file copy endpoint `/api/electron-bridge/files/copy` in `src/main/services/electron-bridge.ts`
+- [x] T012 [P] Implement data folder endpoint `/api/electron-bridge/config/data-folder` in `src/main/services/electron-bridge.ts`
+- [x] T013 Add bridge startup to Electron app initialization in `src/main/index.ts`
+- [x] T014 Create bridge client library in `src/n8n_nodes/lib/bridge-client.ts`
+- [x] T015 Add ELECTRON_BRIDGE_URL environment variable to n8n spawn config in `src/main/n8n-manager.ts`
 
 **Checkpoint**: Bridge running - FileSelector can now communicate with Electron
 
@@ -67,11 +73,11 @@
 
 ### Implementation for User Story 4
 
-- [ ] T018 [US4] Modify n8n-manager.ts to set N8N_CUSTOM_EXTENSIONS environment variable in `src/main/n8n-manager.ts`
-- [ ] T019 [US4] Handle development vs production paths for custom nodes in `src/main/n8n-manager.ts`
-- [ ] T020 [US4] Update build:all script to include n8n_nodes build in root `package.json`
-- [ ] T021 [US4] Update setup:all script to include n8n_nodes setup in root `package.json`
-- [ ] T022 [US4] Verify clean build from scratch works with `npm run build:all`
+- [x] T018 [US4] Modify n8n-manager.ts to set N8N_CUSTOM_EXTENSIONS environment variable in `src/main/n8n-manager.ts`
+- [x] T019 [US4] Handle development vs production paths for custom nodes in `src/main/n8n-manager.ts`
+- [x] T020 [US4] Update build:all script to include n8n_nodes build in root `package.json`
+- [x] T021 [US4] Update setup:all script to include n8n_nodes setup in root `package.json`
+- [x] T022 [US4] Verify clean build from scratch works with `npm run build:all`
 - [ ] T023 [US4] Test that placeholder node appears in n8n palette after startup
 
 **Checkpoint**: Build integration complete - custom nodes sub-project is part of main build
@@ -90,13 +96,13 @@
 
 ### Implementation for User Story 2
 
-- [ ] T025 [P] [US2] Create node directory structure `src/n8n_nodes/nodes/PromptInput/`
-- [ ] T026 [US2] Implement PromptInput.node.ts with htmlEditor parameter in `src/n8n_nodes/nodes/PromptInput/PromptInput.node.ts`
-- [ ] T027 [P] [US2] Create codex file in `src/n8n_nodes/nodes/PromptInput/PromptInput.node.json`
-- [ ] T028 [P] [US2] Create node icon SVG in `src/n8n_nodes/nodes/PromptInput/promptInput.svg`
-- [ ] T029 [US2] Add validation for minLength/maxLength in `src/n8n_nodes/nodes/PromptInput/PromptInput.node.ts`
-- [ ] T030 [US2] Add word count and line count to output in `src/n8n_nodes/nodes/PromptInput/PromptInput.node.ts`
-- [ ] T031 [US2] Register PromptInput in package.json n8n.nodes array in `src/n8n_nodes/package.json`
+- [x] T025 [P] [US2] Create node directory structure `src/n8n_nodes/nodes/PromptInput/`
+- [x] T026 [US2] Implement PromptInput.node.ts with htmlEditor parameter in `src/n8n_nodes/nodes/PromptInput/PromptInput.node.ts`
+- [x] T027 [P] [US2] Create codex file in `src/n8n_nodes/nodes/PromptInput/PromptInput.node.json`
+- [x] T028 [P] [US2] Create node icon SVG in `src/n8n_nodes/nodes/PromptInput/promptInput.svg`
+- [x] T029 [US2] Add validation for minLength/maxLength in `src/n8n_nodes/nodes/PromptInput/PromptInput.node.ts`
+- [x] T030 [US2] Add word count and line count to output in `src/n8n_nodes/nodes/PromptInput/PromptInput.node.ts`
+- [x] T031 [US2] Register PromptInput in package.json n8n.nodes array in `src/n8n_nodes/package.json`
 - [ ] T032 [US2] Test PromptInput node in n8n workflow editor
 
 **Checkpoint**: PromptInput node fully functional - users can enter prompts in workflows
@@ -116,16 +122,16 @@
 
 ### Implementation for User Story 1
 
-- [ ] T035 [P] [US1] Create node directory structure `src/n8n_nodes/nodes/FileSelector/`
-- [ ] T036 [US1] Implement FileSelector.node.ts with bridge client in `src/n8n_nodes/nodes/FileSelector/FileSelector.node.ts`
-- [ ] T037 [P] [US1] Create codex file in `src/n8n_nodes/nodes/FileSelector/FileSelector.node.json`
-- [ ] T038 [P] [US1] Create node icon SVG in `src/n8n_nodes/nodes/FileSelector/fileSelector.svg`
-- [ ] T039 [US1] Implement file type filtering parameter in `src/n8n_nodes/nodes/FileSelector/FileSelector.node.ts`
-- [ ] T040 [US1] Implement multiple file selection parameter in `src/n8n_nodes/nodes/FileSelector/FileSelector.node.ts`
-- [ ] T041 [US1] Implement duplicate handling (rename/skip/overwrite) in `src/n8n_nodes/nodes/FileSelector/FileSelector.node.ts`
-- [ ] T042 [US1] Implement file metadata extraction (size, MIME type, hash) in `src/n8n_nodes/nodes/FileSelector/FileSelector.node.ts`
-- [ ] T043 [US1] Handle dialog cancellation gracefully in `src/n8n_nodes/nodes/FileSelector/FileSelector.node.ts`
-- [ ] T044 [US1] Register FileSelector in package.json n8n.nodes array in `src/n8n_nodes/package.json`
+- [x] T035 [P] [US1] Create node directory structure `src/n8n_nodes/nodes/FileSelector/`
+- [x] T036 [US1] Implement FileSelector.node.ts with bridge client in `src/n8n_nodes/nodes/FileSelector/FileSelector.node.ts`
+- [x] T037 [P] [US1] Create codex file in `src/n8n_nodes/nodes/FileSelector/FileSelector.node.json`
+- [x] T038 [P] [US1] Create node icon SVG in `src/n8n_nodes/nodes/FileSelector/fileSelector.svg`
+- [x] T039 [US1] Implement file type filtering parameter in `src/n8n_nodes/nodes/FileSelector/FileSelector.node.ts`
+- [x] T040 [US1] Implement multiple file selection parameter in `src/n8n_nodes/nodes/FileSelector/FileSelector.node.ts`
+- [x] T041 [US1] Implement duplicate handling (rename/skip/overwrite) in `src/n8n_nodes/nodes/FileSelector/FileSelector.node.ts`
+- [x] T042 [US1] Implement file metadata extraction (size, MIME type, hash) in `src/n8n_nodes/nodes/FileSelector/FileSelector.node.ts`
+- [x] T043 [US1] Handle dialog cancellation gracefully in `src/n8n_nodes/nodes/FileSelector/FileSelector.node.ts`
+- [x] T044 [US1] Register FileSelector in package.json n8n.nodes array in `src/n8n_nodes/package.json`
 - [ ] T045 [US1] Test FileSelector node end-to-end in n8n workflow
 
 **Checkpoint**: FileSelector node fully functional - users can import files into workflows
@@ -144,15 +150,15 @@
 
 ### Implementation for User Story 3
 
-- [ ] T047 [P] [US3] Create node directory structure `src/n8n_nodes/nodes/ResultDisplay/`
-- [ ] T048 [US3] Implement ResultDisplay.node.ts with property path extraction in `src/n8n_nodes/nodes/ResultDisplay/ResultDisplay.node.ts`
-- [ ] T049 [P] [US3] Create codex file in `src/n8n_nodes/nodes/ResultDisplay/ResultDisplay.node.json`
-- [ ] T050 [P] [US3] Create node icon SVG in `src/n8n_nodes/nodes/ResultDisplay/resultDisplay.svg`
-- [ ] T051 [US3] Implement JSON path extraction logic in `src/n8n_nodes/nodes/ResultDisplay/ResultDisplay.node.ts`
-- [ ] T052 [US3] Add fallback text when property not found in `src/n8n_nodes/nodes/ResultDisplay/ResultDisplay.node.ts`
-- [ ] T053 [US3] Implement content truncation for large results in `src/n8n_nodes/nodes/ResultDisplay/ResultDisplay.node.ts`
-- [ ] T054 [US3] Add HTML sanitization for security in `src/n8n_nodes/nodes/ResultDisplay/ResultDisplay.node.ts`
-- [ ] T055 [US3] Register ResultDisplay in package.json n8n.nodes array in `src/n8n_nodes/package.json`
+- [x] T047 [P] [US3] Create node directory structure `src/n8n_nodes/nodes/ResultDisplay/`
+- [x] T048 [US3] Implement ResultDisplay.node.ts with property path extraction in `src/n8n_nodes/nodes/ResultDisplay/ResultDisplay.node.ts`
+- [x] T049 [P] [US3] Create codex file in `src/n8n_nodes/nodes/ResultDisplay/ResultDisplay.node.json`
+- [x] T050 [P] [US3] Create node icon SVG in `src/n8n_nodes/nodes/ResultDisplay/resultDisplay.svg`
+- [x] T051 [US3] Implement JSON path extraction logic in `src/n8n_nodes/nodes/ResultDisplay/ResultDisplay.node.ts`
+- [x] T052 [US3] Add fallback text when property not found in `src/n8n_nodes/nodes/ResultDisplay/ResultDisplay.node.ts`
+- [x] T053 [US3] Implement content truncation for large results in `src/n8n_nodes/nodes/ResultDisplay/ResultDisplay.node.ts`
+- [x] T054 [US3] Add HTML sanitization for security in `src/n8n_nodes/nodes/ResultDisplay/ResultDisplay.node.ts`
+- [x] T055 [US3] Register ResultDisplay in package.json n8n.nodes array in `src/n8n_nodes/package.json`
 - [ ] T056 [US3] Test ResultDisplay node with various input formats
 
 **Checkpoint**: ResultDisplay node fully functional - users can view formatted results
@@ -170,8 +176,10 @@
 - [ ] T061 [P] Create README.md for custom nodes sub-project in `src/n8n_nodes/README.md`
 - [ ] T062 Run all tests and fix any failures
 - [ ] T063 Verify quickstart.md scenarios work end-to-end
-- [ ] T064 Performance testing: file operations with 100MB+ files
+- [ ] T064 Performance testing: file operations with 100MB+ files, verify SC-007 (500MB file handling)
 - [ ] T065 Cross-platform testing: Windows, macOS, Linux
+- [ ] T066 Validate SC-008: PromptInput handles 50,000 characters without degradation
+- [ ] T067 Edge case validation: special characters in filenames, long paths, disk space errors, interrupted copies
 
 ---
 
@@ -296,8 +304,8 @@ With 2 developers:
 | Phase 4: US2 (PromptInput) | 9 | 4 |
 | Phase 5: US1 (FileSelector) | 13 | 4 |
 | Phase 6: US3 (ResultDisplay) | 11 | 4 |
-| Phase 7: Polish | 9 | 4 |
-| **Total** | **65** | **23** |
+| Phase 7: Polish | 11 | 4 |
+| **Total** | **67** | **23** |
 
 ---
 
@@ -310,3 +318,11 @@ With 2 developers:
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently
 - Node icons should be simple, clear SVGs (64x64 recommended)
+
+**Edge Case Coverage**: The following edge cases from spec.md are addressed within implementation tasks:
+- File larger than disk space → T067 (edge case validation)
+- Special characters/long paths → T067 (edge case validation)
+- Data folder not configured → T043 (graceful error handling)
+- Large text content in ResultDisplay → T053 (content truncation)
+- Unsafe markdown elements → T054 (HTML sanitization)
+- Interrupted file copy → T067 (edge case validation)

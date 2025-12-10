@@ -1,0 +1,18 @@
+{
+  "node": "n8n-nodes-desktop.resultDisplay",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Core Nodes"],
+  "subcategories": {
+    "Core Nodes": ["Helpers"]
+  },
+  "resources": {
+    "primaryDocumentation": [
+      {
+        "url": "https://github.com/n8n-desktop/n8n-nodes-desktop"
+      }
+    ]
+  },
+  "alias": ["display", "output", "result", "show", "view", "markdown", "format"],
+  "details": "Display workflow results as formatted text. Supports extracting specific properties from JSON using dot-notation paths, with optional HTML sanitization for security and content truncation for large results."
+}

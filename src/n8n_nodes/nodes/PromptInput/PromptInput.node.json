@@ -1,0 +1,18 @@
+{
+  "node": "n8n-nodes-desktop.promptInput",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Core Nodes"],
+  "subcategories": {
+    "Core Nodes": ["Helpers"]
+  },
+  "resources": {
+    "primaryDocumentation": [
+      {
+        "url": "https://github.com/n8n-desktop/n8n-nodes-desktop"
+      }
+    ]
+  },
+  "alias": ["text", "prompt", "input", "editor", "markdown"],
+  "details": "Enter and format prompt text using a rich text editor. Useful for creating prompts for AI services or any text-based workflow input."
+}

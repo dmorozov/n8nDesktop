@@ -17,11 +17,11 @@ A user working with a document processing workflow needs to select files from th
 
 **Why this priority**: File input is the foundational requirement for most document processing workflows. Without an easy way to get files into the workflow, users cannot leverage the desktop application's local processing capabilities.
 
-**Independent Test**: Can be fully tested by placing a File Selector node in a workflow, clicking to open the file picker, selecting one or more files, and verifying the files are copied to the data folder with correct references output.
+**Independent Test**: Can be fully tested by placing a FileSelector node in a workflow, clicking to open the file picker, selecting one or more files, and verifying the files are copied to the data folder with correct references output.
 
 **Acceptance Scenarios**:
 
-1. **Given** a workflow with a File Selector node, **When** the user clicks the file selection trigger, **Then** a native operating system file picker dialog opens
+1. **Given** a workflow with a FileSelector node, **When** the user clicks the file selection trigger, **Then** a native operating system file picker dialog opens
 2. **Given** an open file picker dialog, **When** the user selects one or more files and confirms, **Then** the selected files are copied to the configured n8n data folder
 3. **Given** files have been copied successfully, **When** the node executes, **Then** the output contains references to the copied files including their new paths and original filenames
 4. **Given** a file selection in progress, **When** the user cancels the dialog, **Then** no files are copied and the node indicates no selection was made
@@ -93,7 +93,7 @@ A developer building the n8n Desktop application needs the custom nodes to be pr
 
 ### Functional Requirements
 
-**File Selector Node:**
+**FileSelector Node:**
 - **FR-001**: System MUST provide a node that triggers a native file picker dialog when activated
 - **FR-002**: System MUST copy selected files to the configured n8n data folder
 - **FR-003**: System MUST output file references including new path and original filename
@@ -101,17 +101,17 @@ A developer building the n8n Desktop application needs the custom nodes to be pr
 - **FR-005**: System MUST handle file selection cancellation gracefully
 - **FR-006**: System MUST support filtering by file types (configurable extensions)
 
-**Prompt Input Node:**
+**PromptInput Node:**
 - **FR-007**: System MUST provide a node with a markdown-capable text editor
-- **FR-008**: System MUST display a preview of formatted content
+- **FR-008**: System SHOULD display a preview of formatted content (note: n8n's built-in htmlEditor provides syntax highlighting but not full markdown rendering preview; full preview is best-effort within n8n UI constraints)
 - **FR-009**: System MUST preserve the raw markdown text as node output
 - **FR-010**: System MUST persist editor content when workflow is saved
 
-**Result Display Node:**
+**ResultDisplay Node:**
 - **FR-011**: System MUST provide a node that renders markdown content as formatted output
 - **FR-012**: System MUST allow configuration of which input property to display
 - **FR-013**: System MUST handle missing or empty properties with appropriate feedback
-- **FR-014**: System MUST sanitize content to prevent rendering of unsafe elements
+- **FR-014**: System MUST sanitize content to prevent rendering of unsafe elements (specifically: strip `<script>`, `<iframe>`, `<object>`, `<embed>` tags; sanitize `javascript:` URLs; escape inline event handlers like `onclick`)
 
 **Build Integration:**
 - **FR-015**: System MUST include custom nodes in the build:all script
