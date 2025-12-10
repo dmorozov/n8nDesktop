@@ -1,0 +1,355 @@
+openapi: 3.0.3
+info:
+  title: Electron Bridge API
+  description: |
+    Local HTTP API for communication between n8n custom nodes and Electron main process.
+    This API runs on localhost and is only accessible from the local machine.
+  version: 1.0.0
+  contact:
+    name: n8n Desktop Team
+
+servers:
+  - url: http://localhost:{port}/api/electron-bridge
+    description: Local Electron Bridge Server
+    variables:
+      port:
+        default: '5679'
+        description: Electron bridge port (configurable)
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      operationId: healthCheck
+      tags:
+        - System
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /files/select:
+    post:
+      summary: Open native file selection dialog
+      operationId: selectFiles
+      tags:
+        - Files
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SelectFilesRequest'
+      responses:
+        '200':
+          description: File selection completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SelectFilesResponse'
+        '408':
+          description: Dialog timeout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /files/copy:
+    post:
+      summary: Copy files to n8n data folder
+      operationId: copyFiles
+      tags:
+        - Files
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CopyFilesRequest'
+      responses:
+        '200':
+          description: Files copied successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CopyFilesResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Copy operation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /config/data-folder:
+    get:
+      summary: Get n8n data folder path
+      operationId: getDataFolder
+      tags:
+        - Configuration
+      responses:
+        '200':
+          description: Data folder path retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataFolderResponse'
+        '500':
+          description: Failed to get data folder
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    SelectFilesRequest:
+      type: object
+      required:
+        - requestId
+      properties:
+        requestId:
+          type: string
+          format: uuid
+          description: Unique request identifier for correlation
+        title:
+          type: string
+          default: 'Select Files'
+          description: Dialog window title
+        filters:
+          type: array
+          description: File type filters
+          items:
+            type: object
+            required:
+              - name
+              - extensions
+            properties:
+              name:
+                type: string
+                description: Filter display name
+                example: 'Documents'
+              extensions:
+                type: array
+                items:
+                  type: string
+                description: File extensions (without dots)
+                example: ['pdf', 'docx', 'txt']
+        multiSelect:
+          type: boolean
+          default: true
+          description: Allow multiple file selection
+        defaultPath:
+          type: string
+          description: Initial directory to open
+        timeout:
+          type: integer
+          minimum: 1000
+          maximum: 300000
+          default: 60000
+          description: Dialog timeout in milliseconds
+
+    SelectFilesResponse:
+      type: object
+      required:
+        - requestId
+        - success
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        success:
+          type: boolean
+        cancelled:
+          type: boolean
+          description: True if user cancelled the dialog
+        selectedPaths:
+          type: array
+          items:
+            type: string
+          description: Array of selected file paths
+        fileCount:
+          type: integer
+          minimum: 0
+        error:
+          type: string
+          description: Error message if success is false
+
+    CopyFilesRequest:
+      type: object
+      required:
+        - requestId
+        - files
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        files:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required:
+              - sourcePath
+            properties:
+              sourcePath:
+                type: string
+                description: Full path to source file
+              destinationName:
+                type: string
+                description: Optional custom filename for destination
+        destinationSubfolder:
+          type: string
+          default: 'imports'
+          description: Subfolder within data folder
+        duplicateHandling:
+          type: string
+          enum: [rename, skip, overwrite]
+          default: 'rename'
+          description: How to handle existing files
+
+    CopyFilesResponse:
+      type: object
+      required:
+        - requestId
+        - success
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        success:
+          type: boolean
+        copiedFiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/FileReference'
+        skippedFiles:
+          type: array
+          items:
+            type: object
+            properties:
+              sourcePath:
+                type: string
+              reason:
+                type: string
+        totalSize:
+          type: integer
+          description: Total bytes copied
+        error:
+          type: string
+
+    FileReference:
+      type: object
+      required:
+        - id
+        - originalName
+        - originalPath
+        - destinationPath
+        - size
+        - mimeType
+        - extension
+        - copiedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        originalName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        originalPath:
+          type: string
+        destinationPath:
+          type: string
+        size:
+          type: integer
+          minimum: 0
+        mimeType:
+          type: string
+          pattern: '^[a-z]+/[a-z0-9\-\+\.]+$'
+        extension:
+          type: string
+          pattern: '^[a-z0-9]+$'
+        copiedAt:
+          type: string
+          format: date-time
+        hash:
+          type: string
+          description: SHA-256 hash of file content
+
+    DataFolderResponse:
+      type: object
+      required:
+        - success
+        - dataFolder
+      properties:
+        success:
+          type: boolean
+        dataFolder:
+          type: string
+          description: Absolute path to n8n data folder
+        importsFolder:
+          type: string
+          description: Absolute path to imports subfolder
+        freeSpace:
+          type: integer
+          description: Available disk space in bytes
+
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        error:
+          type: string
+        errorCode:
+          type: string
+          description: Machine-readable error code
+        details:
+          type: object
+          description: Additional error context
+
+  securitySchemes:
+    LocalhostOnly:
+      type: apiKey
+      in: header
+      name: X-Request-Source
+      description: |
+        This API is secured by binding to localhost only.
+        The X-Request-Source header is used for logging/debugging.
+
+security:
+  - LocalhostOnly: []
+
+tags:
+  - name: Files
+    description: File selection and copy operations
+  - name: Configuration
+    description: Application configuration endpoints
+  - name: System
+    description: System health and status
