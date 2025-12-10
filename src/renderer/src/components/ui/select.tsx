@@ -1,7 +1,25 @@
-import { forwardRef, useState, useRef, useEffect } from 'react';
+import { forwardRef, useState, useRef, useEffect, createContext, useContext } from 'react';
 import { type HTMLAttributes, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+interface SelectContextValue {
+  value: string | undefined;
+  onValueChange: (value: string) => void;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  disabled: boolean;
+}
+
+const SelectContext = createContext<SelectContextValue | null>(null);
+
+function useSelectContext() {
+  const context = useContext(SelectContext);
+  if (!context) {
+    throw new Error('Select components must be used within a Select');
+  }
+  return context;
+}
 
 interface SelectProps {
   value?: string;
@@ -10,43 +28,40 @@ interface SelectProps {
   disabled?: boolean;
 }
 
-interface SelectContextValue {
-  value: string | undefined;
-  onValueChange: (value: string) => void;
-  open: boolean;
-  setOpen: (open: boolean) => void;
-}
-
-let selectContext: SelectContextValue | null = null;
-
-function Select({ value, onValueChange, children, disabled }: SelectProps) {
+function Select({ value, onValueChange, children, disabled = false }: SelectProps) {
   const [open, setOpen] = useState(false);
 
-  selectContext = {
+  const contextValue: SelectContextValue = {
     value,
     onValueChange: onValueChange ?? (() => {}),
     open,
     setOpen: disabled ? () => {} : setOpen,
+    disabled,
   };
 
-  return <div className="relative">{children}</div>;
+  return (
+    <SelectContext.Provider value={contextValue}>
+      <div className="relative">{children}</div>
+    </SelectContext.Provider>
+  );
 }
 
 type SelectTriggerProps = ButtonHTMLAttributes<HTMLButtonElement>;
 
 const SelectTrigger = forwardRef<HTMLButtonElement, SelectTriggerProps>(
   ({ className, children, ...props }, ref) => {
-    const triggerRef = useRef<HTMLButtonElement>(null);
+    const { open, setOpen, disabled } = useSelectContext();
 
     return (
       <button
-        ref={ref || triggerRef}
+        ref={ref}
         type="button"
         className={cn(
           'flex h-9 w-full items-center justify-between gap-2 whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1',
           className
         )}
-        onClick={() => selectContext?.setOpen(!selectContext.open)}
+        onClick={() => !disabled && setOpen(!open)}
+        disabled={disabled}
         {...props}
       >
         {children}
@@ -62,28 +77,48 @@ interface SelectValueProps {
 }
 
 function SelectValue({ placeholder }: SelectValueProps) {
-  return <span>{selectContext?.value || placeholder}</span>;
+  const { value } = useSelectContext();
+  return <span>{value || placeholder}</span>;
 }
 
 type SelectContentProps = HTMLAttributes<HTMLDivElement>;
 
 const SelectContent = forwardRef<HTMLDivElement, SelectContentProps>(
   ({ className, children, ...props }, _ref) => {
+    const { open, setOpen } = useSelectContext();
     const contentRef = useRef<HTMLDivElement>(null);
 
     // Close on click outside
     useEffect(() => {
+      if (!open) return;
+
       const handleClickOutside = (e: MouseEvent) => {
-        if (selectContext?.open && contentRef.current && !contentRef.current.contains(e.target as Node)) {
-          selectContext.setOpen(false);
+        if (contentRef.current && !contentRef.current.contains(e.target as Node)) {
+          // Use setTimeout to allow click events on items to fire first
+          setTimeout(() => setOpen(false), 0);
         }
       };
 
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+      // Use click instead of mousedown to avoid race conditions
+      document.addEventListener('click', handleClickOutside, true);
+      return () => document.removeEventListener('click', handleClickOutside, true);
+    }, [open, setOpen]);
 
-    if (!selectContext?.open) return null;
+    // Close on escape
+    useEffect(() => {
+      if (!open) return;
+
+      const handleEscape = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          setOpen(false);
+        }
+      };
+
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }, [open, setOpen]);
+
+    if (!open) return null;
 
     return (
       <div
@@ -107,11 +142,13 @@ interface SelectItemProps extends HTMLAttributes<HTMLDivElement> {
 
 const SelectItem = forwardRef<HTMLDivElement, SelectItemProps>(
   ({ className, children, value, ...props }, ref) => {
-    const isSelected = selectContext?.value === value;
+    const { value: selectedValue, onValueChange, setOpen } = useSelectContext();
+    const isSelected = selectedValue === value;
 
-    const handleClick = () => {
-      selectContext?.onValueChange(value);
-      selectContext?.setOpen(false);
+    const handleClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onValueChange(value);
+      setOpen(false);
     };
 
     return (

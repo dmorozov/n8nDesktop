@@ -11,6 +11,7 @@
   "license": "MIT",
   "scripts": {
     "start": "electron-forge start",
+    "start:debug": "electron-forge start -- --remote-debugging-port=9222",
     "dev": "electron-forge start",
     "build": "electron-forge package",
     "make": "electron-forge make",

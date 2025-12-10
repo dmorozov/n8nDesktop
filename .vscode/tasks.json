@@ -13,6 +13,26 @@
       }
     },
     {
+      "label": "electron-forge: start with remote debugging",
+      "type": "npm",
+      "script": "start:debug",
+      "isBackground": true,
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^never match this$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*Compiling.*$",
+          "endsPattern": "^.*Launching Electron.*|^.*webpack compiled.*$"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
       "label": "electron-forge: build",
       "type": "npm",
       "script": "build",
