@@ -1,7 +1,7 @@
 {
   "id": "pdf-processing",
   "name": "PDF Processing with AI Summary",
-  "description": "Extract document text with Docling OCR and generate AI summary",
+  "description": "Extract document text with Docling OCR and generate AI summary using Map-Reduce for large documents",
   "icon": "file",
   "workflow": {
     "name": "PDF Processing with AI Summary",
@@ -15,14 +15,14 @@
       },
       {
         "parameters": {
-          "jsCode": "// Configure the PDF file path to process\n// Replace this with your actual file path\nconst filePath = '{{N8N_FILES_FOLDER}}/sample.pdf';\n\n// Options for Docling processing\nconst options = {\n  // Set to true to include page markers like <!-- PAGE: 1 --> in output\n  include_page_markers: false\n};\n\nreturn [{ json: { file_path: filePath, options: options } }];"
+          "jsCode": "// Configure the PDF file path to process\n// Replace this with your actual file path\nconst filePath = '{{N8N_FILES_FOLDER}}/sample.pdf';\n\n// Options for Docling processing\nconst options = {\n  // Set to true to include page markers like <!-- PAGE: 1 --> in output\n  include_page_markers: false\n};\n\n// Chunk size for Map-Reduce summarization (in characters)\n// Default: 4096 tokens ≈ 16384 characters (4 chars per token average)\nconst chunkSize = 16384;\nconst chunkOverlap = 200;\n\nreturn [{ json: { file_path: filePath, options: options, chunkSize: chunkSize, chunkOverlap: chunkOverlap } }];"
         },
         "name": "Set File Path",
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [440, 300],
         "notesInFlow": true,
-        "notes": "Configure your PDF file path here. Set include_page_markers to true if you need page references."
+        "notes": "Configure file path and chunk size. Default 4096 tokens (~16384 chars)."
       },
       {
         "parameters": {
@@ -53,7 +53,7 @@
       },
       {
         "parameters": {
-          "jsCode": "// Extract job_id from Docling response\nconst response = $input.first().json;\nif (!response.job_id) {\n  throw new Error('No job_id returned from Docling');\n}\nreturn [{ json: { job_id: response.job_id, status: response.status } }];"
+          "jsCode": "// Extract job_id and pass through chunk settings\nconst response = $input.first().json;\nconst settings = $('Set File Path').first().json;\nif (!response.job_id) {\n  throw new Error('No job_id returned from Docling');\n}\nreturn [{ json: { \n  job_id: response.job_id, \n  status: response.status,\n  chunkSize: settings.chunkSize,\n  chunkOverlap: settings.chunkOverlap\n} }];"
         },
         "name": "Extract Job ID",
         "type": "n8n-nodes-base.code",
@@ -121,7 +121,7 @@
       },
       {
         "parameters": {
-          "jsCode": "// Extract the markdown result from completed job\nconst job = $input.first().json;\n\nif (job.status === 'failed') {\n  return [{\n    json: {\n      error: 'Processing failed',\n      message: job.error || 'Unknown error',\n      error_type: job.error_type\n    }\n  }];\n}\n\nconst result = job.result || {};\nreturn [{\n  json: {\n    markdown: result.markdown || '',\n    metadata: result.metadata || {},\n    status: result.status,\n    job_id: job.job_id,\n    file_path: job.file_path\n  }\n}];"
+          "jsCode": "// Extract the markdown result from completed job\nconst job = $input.first().json;\nconst settings = $('Extract Job ID').first().json;\n\nif (job.status === 'failed') {\n  return [{\n    json: {\n      error: 'Processing failed',\n      message: job.error || 'Unknown error',\n      error_type: job.error_type\n    }\n  }];\n}\n\nconst result = job.result || {};\nreturn [{\n  json: {\n    markdown: result.markdown || '',\n    metadata: result.metadata || {},\n    status: result.status,\n    job_id: job.job_id,\n    file_path: job.file_path,\n    chunkSize: settings.chunkSize,\n    chunkOverlap: settings.chunkOverlap\n  }\n}];"
         },
         "name": "Process Result",
         "type": "n8n-nodes-base.code",
@@ -130,21 +130,38 @@
       },
       {
         "parameters": {
-          "promptType": "define",
-          "text": "={{ $json.markdown }}",
+          "chunkingMode": "simple",
+          "chunkSize": "={{ $json.chunkSize }}",
+          "chunkOverlap": "={{ $json.chunkOverlap }}",
           "options": {
-            "systemMessage": "You are a helpful assistant that creates concise summaries of documents. When given document text, provide:\n\n1. A brief overview (2-3 sentences)\n2. Key points (bullet list)\n3. Main topics covered\n\nKeep your summary clear and well-organized. Use markdown formatting."
+            "summarizationMethodAndPrompts": {
+              "values": {
+                "summarizationMethod": "map_reduce",
+                "prompt": "Write a concise summary of the following text:\n\n{text}\n\nCONCISE SUMMARY:",
+                "combineMapPrompt": "You are given a set of summaries from a document. Combine them into a final, coherent summary that includes:\n\n1. A brief overview (2-3 sentences)\n2. Key points (bullet list)\n3. Main topics covered\n\nSummaries:\n{text}\n\nFINAL SUMMARY:"
+              }
+            }
           }
         },
-        "name": "AI Agent",
-        "type": "@n8n/n8n-nodes-langchain.agent",
-        "typeVersion": 1.7,
+        "name": "Summarization Chain",
+        "type": "@n8n/n8n-nodes-langchain.chainSummarization",
+        "typeVersion": 2,
         "position": [1640, 200]
       },
       {
         "parameters": {
+          "model": "gpt-4o-mini",
+          "options": {}
+        },
+        "name": "OpenAI Chat Model",
+        "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+        "typeVersion": 1,
+        "position": [1640, 400]
+      },
+      {
+        "parameters": {
           "mode": "markdownToHtml",
-          "markdown": "={{ $json.output }}",
+          "markdown": "={{ $json.response.text }}",
           "options": {}
         },
         "name": "Markdown to HTML",
@@ -154,7 +171,7 @@
       },
       {
         "parameters": {
-          "jsCode": "// Format the final output with both HTML and original markdown\nconst html = $input.first().json.data;\nconst markdown = $('AI Agent').first().json.output;\n\nreturn [{\n  json: {\n    summary_html: html,\n    summary_markdown: markdown,\n    original_document: $('Process Result').first().json.markdown,\n    metadata: $('Process Result').first().json.metadata\n  }\n}];"
+          "jsCode": "// Format the final output with both HTML and original markdown\nconst html = $input.first().json.data;\nconst summaryResponse = $('Summarization Chain').first().json.response;\nconst processResult = $('Process Result').first().json;\n\nreturn [{\n  json: {\n    summary_html: html,\n    summary_markdown: summaryResponse.text,\n    original_document: processResult.markdown,\n    metadata: processResult.metadata,\n    chunk_settings: {\n      chunk_size: processResult.chunkSize,\n      chunk_overlap: processResult.chunkOverlap\n    }\n  }\n}];"
         },
         "name": "Format Output",
         "type": "n8n-nodes-base.code",
@@ -251,14 +268,25 @@
         "main": [
           [
             {
-              "node": "AI Agent",
+              "node": "Summarization Chain",
               "type": "main",
               "index": 0
             }
           ]
         ]
       },
-      "AI Agent": {
+      "OpenAI Chat Model": {
+        "ai_languageModel": [
+          [
+            {
+              "node": "Summarization Chain",
+              "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Summarization Chain": {
         "main": [
           [
             {
