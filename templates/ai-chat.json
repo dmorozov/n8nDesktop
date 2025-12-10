@@ -15,12 +15,50 @@
       },
       {
         "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "prompt-input",
+                "name": "chatInput",
+                "value": "Hello! What can you help me with today?",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "name": "User Prompt",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [460, 300]
+      },
+      {
+        "parameters": {
           "options": {}
         },
         "name": "AI Agent",
         "type": "@n8n/n8n-nodes-langchain.agent",
         "typeVersion": 1.7,
-        "position": [460, 300]
+        "position": [680, 300]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "output-result",
+                "name": "response",
+                "value": "={{ $json.output }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "name": "Show Result",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [900, 300]
       }
     ],
     "connections": {
@@ -28,7 +66,29 @@
         "main": [
           [
             {
+              "node": "User Prompt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "User Prompt": {
+        "main": [
+          [
+            {
               "node": "AI Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Agent": {
+        "main": [
+          [
+            {
+              "node": "Show Result",
               "type": "main",
               "index": 0
             }
