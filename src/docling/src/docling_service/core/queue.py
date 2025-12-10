@@ -287,6 +287,7 @@ class JobQueue:
                     processing_tier=job.options.get("processing_tier"),
                     languages=job.options.get("languages"),
                     force_full_page_ocr=job.options.get("force_full_page_ocr", False),
+                    include_page_markers=job.options.get("include_page_markers", False),
                     trace_id=job.trace_id,
                 ),
                 timeout=timeout_seconds,

@@ -109,21 +109,23 @@ async def process_document(
     processing_tier: str | None = None,
     languages: list[str] | None = None,
     force_full_page_ocr: bool = False,
+    include_page_markers: bool = False,
     trace_id: str | None = None,
 ) -> dict:
-    """Process a document and return page-annotated Markdown.
+    """Process a document and return Markdown.
 
     Args:
         file_path: Path to the document file
         processing_tier: Override default processing tier
         languages: OCR language codes
         force_full_page_ocr: Force OCR on all pages
+        include_page_markers: Include page number markers in output (default: False)
         trace_id: Trace ID for log correlation
 
     Returns:
         Dictionary containing:
         - status: 'success' or 'error'
-        - markdown: Page-annotated Markdown content
+        - markdown: Markdown content (with or without page markers)
         - metadata: Processing metadata (page_count, processing_time, etc.)
         - error: Error message if failed
     """
@@ -165,9 +167,13 @@ async def process_document(
 
         log.info("conversion_completed", status="SUCCESS")
 
-        # Generate page-annotated Markdown
-        log.info("markdown_generation_starting")
-        markdown = generate_page_annotated_markdown(result.document)
+        # Generate Markdown (with or without page markers)
+        log.info("markdown_generation_starting", include_page_markers=include_page_markers)
+        if include_page_markers:
+            markdown = generate_page_annotated_markdown(result.document)
+        else:
+            # Use docling's built-in export for clean markdown without page markers
+            markdown = result.document.export_to_markdown()
         log.info("markdown_generation_completed", length=len(markdown))
 
         # Extract metadata

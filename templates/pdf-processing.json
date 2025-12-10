@@ -1,10 +1,10 @@
 {
   "id": "pdf-processing",
-  "name": "PDF Processing",
-  "description": "Extract and transform document data with Docling OCR",
+  "name": "PDF Processing with AI Summary",
+  "description": "Extract document text with Docling OCR and generate AI summary",
   "icon": "file",
   "workflow": {
-    "name": "PDF Processing",
+    "name": "PDF Processing with AI Summary",
     "nodes": [
       {
         "parameters": {},
@@ -15,14 +15,14 @@
       },
       {
         "parameters": {
-          "jsCode": "// Configure the PDF file path to process\n// Replace this with your actual file path, or pass it from a previous node\nconst filePath = '{{N8N_FILES_FOLDER}}/sample.pdf';\n\n// You can also get the file path from input data:\n// const filePath = $input.first().json.file_path;\n\nreturn [{ json: { file_path: filePath } }];"
+          "jsCode": "// Configure the PDF file path to process\n// Replace this with your actual file path\nconst filePath = '{{N8N_FILES_FOLDER}}/sample.pdf';\n\n// Options for Docling processing\nconst options = {\n  // Set to true to include page markers like <!-- PAGE: 1 --> in output\n  include_page_markers: false\n};\n\nreturn [{ json: { file_path: filePath, options: options } }];"
         },
         "name": "Set File Path",
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [440, 300],
         "notesInFlow": true,
-        "notes": "Configure your PDF file path here. Files should be in the n8n-files folder."
+        "notes": "Configure your PDF file path here. Set include_page_markers to true if you need page references."
       },
       {
         "parameters": {
@@ -43,7 +43,7 @@
           },
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={{ JSON.stringify({ file_path: $json.file_path }) }}",
+          "jsonBody": "={{ JSON.stringify({ file_path: $json.file_path, options: $json.options }) }}",
           "options": {}
         },
         "name": "Submit to Docling",
@@ -127,6 +127,39 @@
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [1440, 200]
+      },
+      {
+        "parameters": {
+          "promptType": "define",
+          "text": "={{ $json.markdown }}",
+          "options": {
+            "systemMessage": "You are a helpful assistant that creates concise summaries of documents. When given document text, provide:\n\n1. A brief overview (2-3 sentences)\n2. Key points (bullet list)\n3. Main topics covered\n\nKeep your summary clear and well-organized. Use markdown formatting."
+          }
+        },
+        "name": "AI Agent",
+        "type": "@n8n/n8n-nodes-langchain.agent",
+        "typeVersion": 1.7,
+        "position": [1640, 200]
+      },
+      {
+        "parameters": {
+          "mode": "markdownToHtml",
+          "markdown": "={{ $json.output }}",
+          "options": {}
+        },
+        "name": "Markdown to HTML",
+        "type": "n8n-nodes-base.markdown",
+        "typeVersion": 1,
+        "position": [1840, 200]
+      },
+      {
+        "parameters": {
+          "jsCode": "// Format the final output with both HTML and original markdown\nconst html = $input.first().json.data;\nconst markdown = $('AI Agent').first().json.output;\n\nreturn [{\n  json: {\n    summary_html: html,\n    summary_markdown: markdown,\n    original_document: $('Process Result').first().json.markdown,\n    metadata: $('Process Result').first().json.metadata\n  }\n}];"
+        },
+        "name": "Format Output",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [2040, 200]
       }
     ],
     "connections": {
@@ -208,6 +241,39 @@
           [
             {
               "node": "Poll Job Status",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Process Result": {
+        "main": [
+          [
+            {
+              "node": "AI Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Agent": {
+        "main": [
+          [
+            {
+              "node": "Markdown to HTML",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Markdown to HTML": {
+        "main": [
+          [
+            {
+              "node": "Format Output",
               "type": "main",
               "index": 0
             }

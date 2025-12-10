@@ -21,6 +21,10 @@ class ProcessingOptions(BaseModel):
         default=False,
         description="Force OCR on all pages (slower but more accurate for scanned documents)",
     )
+    include_page_markers: bool = Field(
+        default=False,
+        description="Include page number markers in the Markdown output (default: false for clean markdown)",
+    )
     timeout_seconds: int | None = Field(
         default=None,
         description="Override calculated timeout",

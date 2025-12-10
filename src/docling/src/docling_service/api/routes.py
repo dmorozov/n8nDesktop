@@ -135,6 +135,7 @@ async def process_document(
             "processing_tier": request.options.processing_tier,
             "languages": request.options.languages,
             "force_full_page_ocr": request.options.force_full_page_ocr,
+            "include_page_markers": request.options.include_page_markers,
             "timeout_seconds": request.options.timeout_seconds,
         }
 
@@ -189,6 +190,7 @@ async def process_batch(
             "processing_tier": request.options.processing_tier,
             "languages": request.options.languages,
             "force_full_page_ocr": request.options.force_full_page_ocr,
+            "include_page_markers": request.options.include_page_markers,
             "timeout_seconds": request.options.timeout_seconds,
         }
 
