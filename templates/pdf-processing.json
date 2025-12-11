@@ -15,14 +15,15 @@
       },
       {
         "parameters": {
-          "jsCode": "// Configure the PDF file path to process\n// Replace this with your actual file path\nconst filePath = '{{N8N_FILES_FOLDER}}/sample.pdf';\n\n// Options for Docling processing\nconst options = {\n  // Set to true to include page markers like <!-- PAGE: 1 --> in output\n  include_page_markers: false\n};\n\n// Chunk size for Map-Reduce summarization (in characters)\n// Default: 4096 tokens ≈ 16384 characters (4 chars per token average)\nconst chunkSize = 16384;\nconst chunkOverlap = 200;\n\nreturn [{ json: { file_path: filePath, options: options, chunkSize: chunkSize, chunkOverlap: chunkOverlap } }];"
+          "operation": "useStored",
+          "filterType": "documents"
         },
-        "name": "Set File Path",
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
+        "name": "File Selector",
+        "type": "CUSTOM.fileSelector",
+        "typeVersion": 1,
         "position": [440, 300],
         "notesInFlow": true,
-        "notes": "Configure file path and chunk size. Default 4096 tokens (~16384 chars)."
+        "notes": "Select a PDF or document file to process"
       },
       {
         "parameters": {
@@ -43,7 +44,7 @@
           },
           "sendBody": true,
           "specifyBody": "json",
-          "jsonBody": "={{ JSON.stringify({ file_path: $json.file_path, options: $json.options }) }}",
+          "jsonBody": "={{ JSON.stringify({ file_path: $json.files[0].path, options: { include_page_markers: false } }) }}",
           "options": {}
         },
         "name": "Submit to Docling",
@@ -53,7 +54,7 @@
       },
       {
         "parameters": {
-          "jsCode": "// Extract job_id and pass through chunk settings\nconst response = $input.first().json;\nconst settings = $('Set File Path').first().json;\nif (!response.job_id) {\n  throw new Error('No job_id returned from Docling');\n}\nreturn [{ json: { \n  job_id: response.job_id, \n  status: response.status,\n  chunkSize: settings.chunkSize,\n  chunkOverlap: settings.chunkOverlap\n} }];"
+          "jsCode": "// Extract job_id from response\nconst response = $input.first().json;\nif (!response.job_id) {\n  throw new Error('No job_id returned from Docling');\n}\nreturn [{ json: { \n  job_id: response.job_id, \n  status: response.status\n} }];"
         },
         "name": "Extract Job ID",
         "type": "n8n-nodes-base.code",
@@ -121,7 +122,7 @@
       },
       {
         "parameters": {
-          "jsCode": "// Extract the markdown result from completed job\nconst job = $input.first().json;\nconst settings = $('Extract Job ID').first().json;\n\nif (job.status === 'failed') {\n  return [{\n    json: {\n      error: 'Processing failed',\n      message: job.error || 'Unknown error',\n      error_type: job.error_type\n    }\n  }];\n}\n\nconst result = job.result || {};\nreturn [{\n  json: {\n    markdown: result.markdown || '',\n    metadata: result.metadata || {},\n    status: result.status,\n    job_id: job.job_id,\n    file_path: job.file_path,\n    chunkSize: settings.chunkSize,\n    chunkOverlap: settings.chunkOverlap\n  }\n}];"
+          "jsCode": "// Extract the markdown result from completed job\nconst job = $input.first().json;\n\nif (job.status === 'failed') {\n  return [{\n    json: {\n      error: 'Processing failed',\n      message: job.error || 'Unknown error',\n      error_type: job.error_type\n    }\n  }];\n}\n\nconst result = job.result || {};\nreturn [{\n  json: {\n    markdown: result.markdown || '',\n    metadata: result.metadata || {},\n    status: result.status,\n    job_id: job.job_id,\n    file_path: job.file_path\n  }\n}];"
         },
         "name": "Process Result",
         "type": "n8n-nodes-base.code",
@@ -131,8 +132,8 @@
       {
         "parameters": {
           "chunkingMode": "simple",
-          "chunkSize": "={{ $json.chunkSize }}",
-          "chunkOverlap": "={{ $json.chunkOverlap }}",
+          "chunkSize": 16384,
+          "chunkOverlap": 200,
           "options": {
             "summarizationMethodAndPrompts": {
               "values": {
@@ -171,7 +172,7 @@
       },
       {
         "parameters": {
-          "jsCode": "// Format the final output with both HTML and original markdown\nconst html = $input.first().json.data;\nconst summaryResponse = $('Summarization Chain').first().json.response;\nconst processResult = $('Process Result').first().json;\n\nreturn [{\n  json: {\n    summary_html: html,\n    summary_markdown: summaryResponse.text,\n    original_document: processResult.markdown,\n    metadata: processResult.metadata,\n    chunk_settings: {\n      chunk_size: processResult.chunkSize,\n      chunk_overlap: processResult.chunkOverlap\n    }\n  }\n}];"
+          "jsCode": "// Format the final output with both HTML and original markdown\nconst html = $input.first().json.data;\nconst summaryResponse = $('Summarization Chain').first().json.response;\nconst processResult = $('Process Result').first().json;\n\nreturn [{\n  json: {\n    summary_html: html,\n    summary_markdown: summaryResponse.text,\n    original_document: processResult.markdown,\n    metadata: processResult.metadata\n  }\n}];"
         },
         "name": "Format Output",
         "type": "n8n-nodes-base.code",
@@ -184,14 +185,14 @@
         "main": [
           [
             {
-              "node": "Set File Path",
+              "node": "File Selector",
               "type": "main",
               "index": 0
             }
           ]
         ]
       },
-      "Set File Path": {
+      "File Selector": {
         "main": [
           [
             {

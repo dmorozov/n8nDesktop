@@ -51,6 +51,8 @@ Constitution: `.specify/memory/constitution.md`
 - File-based (temp folder for processing), electron-store (config) (003-docling-integration)
 - TypeScript 5.9+, Node.js 22+ + n8n-workflow, @n8n/node-cli (build), React 19 (if UI components needed) (009-custom-n8n-nodes)
 - File-based (n8n data folder), n8n workflow JSON (009-custom-n8n-nodes)
+- TypeScript 5.6+ + React 19, Electron 39, electron-store, Radix UI, TailwindCSS 4, n8n-workflow (for node detection) (010-workflow-execution-popup)
+- electron-store (popup configs), n8n SQLite (workflows) (010-workflow-execution-popup)
 
 ## Recent Changes
 - 002-ui-design: Added TypeScript 5.6+, Node.js 20.x LTS + Electron 28+, Preact 10.24+, Vite 5+, TailwindCSS 4+, n8n (bundled)

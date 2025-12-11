@@ -9,6 +9,10 @@ import type {
   DoclingStatus,
   DoclingConfig,
   DoclingProcessOptions,
+  WorkflowPopupConfig,
+  WorkflowPopupExecuteRequest,
+  WorkflowPopupFileSelectOptions,
+  WorkflowPopupFileSaveOptions,
 } from './types';
 
 // Create the API object
@@ -132,6 +136,21 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.on('updates:dismissed', listener);
       return () => ipcRenderer.removeListener('updates:dismissed', listener);
     },
+  },
+
+  // Workflow Execution Popup
+  workflowPopup: {
+    analyze: (workflowId: string) => ipcRenderer.invoke('workflow-popup:analyze', workflowId),
+    getConfig: (workflowId: string) => ipcRenderer.invoke('workflow-popup:get-config', workflowId),
+    saveConfig: (config: WorkflowPopupConfig) => ipcRenderer.invoke('workflow-popup:save-config', config),
+    deleteConfig: (workflowId: string) => ipcRenderer.invoke('workflow-popup:delete-config', workflowId),
+    execute: (request: WorkflowPopupExecuteRequest) => ipcRenderer.invoke('workflow-popup:execute', request),
+    status: (executionId: string) => ipcRenderer.invoke('workflow-popup:status', executionId),
+    cancel: (executionId: string) => ipcRenderer.invoke('workflow-popup:cancel', executionId),
+    selectFiles: (options: WorkflowPopupFileSelectOptions) => ipcRenderer.invoke('workflow-popup:select-files', options),
+    saveFile: (options: WorkflowPopupFileSaveOptions) => ipcRenderer.invoke('workflow-popup:save-file', options),
+    copyOutputFile: (sourcePath: string, destinationPath: string) =>
+      ipcRenderer.invoke('workflow-popup:copy-output-file', sourcePath, destinationPath),
   },
 
   // Docling OCR service

@@ -18,6 +18,7 @@ interface WorkflowCardProps {
   workflow: Workflow;
   onRun?: (workflow: Workflow) => void;
   onEdit?: (workflow: Workflow) => void;
+  onOpenPopup?: (workflow: Workflow) => void;
   onDuplicate?: (workflow: Workflow) => void;
   onDelete?: (workflow: Workflow) => void;
   onExport?: (workflow: Workflow) => void;
@@ -28,6 +29,7 @@ export function WorkflowCard({
   workflow,
   onRun,
   onEdit,
+  onOpenPopup,
   onDuplicate,
   onDelete,
   onExport,
@@ -38,13 +40,18 @@ export function WorkflowCard({
   const displayName = workflow.name || 'Untitled Workflow';
   const displayDescription = workflow.description || 'No description';
 
-  // Handle keyboard interaction - Enter to edit, Space to run
+  // Handle keyboard interaction - Enter to open popup, Space to run
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       switch (event.key) {
         case 'Enter':
           event.preventDefault();
-          onEdit?.(workflow);
+          // Open popup if available, otherwise fall back to edit (FR-001)
+          if (onOpenPopup) {
+            onOpenPopup(workflow);
+          } else {
+            onEdit?.(workflow);
+          }
           break;
         case ' ':
           event.preventDefault();
@@ -54,7 +61,7 @@ export function WorkflowCard({
           break;
       }
     },
-    [workflow, onEdit, onRun, isRunning]
+    [workflow, onEdit, onOpenPopup, onRun, isRunning]
   );
 
   return (
@@ -62,9 +69,9 @@ export function WorkflowCard({
       className="group relative overflow-hidden transition-all hover:border-primary/50 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer"
       tabIndex={0}
       role="article"
-      aria-label={`Workflow: ${displayName}. ${workflow.active ? 'Active' : 'Inactive'}. ${nodeCount} nodes. Press Enter to edit, Space to run.`}
+      aria-label={`Workflow: ${displayName}. ${workflow.active ? 'Active' : 'Inactive'}. ${nodeCount} nodes. Press Enter to open, Space to run.`}
       onKeyDown={handleKeyDown}
-      onClick={() => onEdit?.(workflow)}
+      onClick={() => onOpenPopup ? onOpenPopup(workflow) : onEdit?.(workflow)}
     >
       <CardContent className="p-4">
         {/* Header: Name and Menu */}

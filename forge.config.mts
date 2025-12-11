@@ -3,6 +3,8 @@ import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDMG } from '@electron-forge/maker-dmg';
 import { VitePlugin } from '@electron-forge/plugin-vite';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -17,7 +19,9 @@ const config: ForgeConfig = {
     appBundleId: 'com.n8n.desktop',
     appCategoryType: 'public.app-category.developer-tools',
     // Extra resources to include in the package
-    extraResource: ['resources'],
+    // - resources: icons and other static assets
+    // - src/n8n_nodes: custom n8n nodes package (built separately)
+    extraResource: ['resources', 'src/n8n_nodes'],
     // Note: Don't set 'ignore' here - the Vite plugin automatically sets it
     // to only include the '.vite' folder for optimal package size
     // macOS signing (requires proper certificates in CI)
@@ -77,6 +81,38 @@ const config: ForgeConfig = {
       ],
     }),
   ],
+  hooks: {
+    // Clean up unnecessary files from n8n_nodes after packaging
+    postPackage: async (_config, packageResult) => {
+      for (const outputPath of packageResult.outputPaths) {
+        // Find n8n_nodes in resources folder
+        const resourcesPath = path.join(outputPath, 'resources');
+        const n8nNodesPath = path.join(resourcesPath, 'n8n_nodes');
+
+        if (fs.existsSync(n8nNodesPath)) {
+          console.log('Cleaning up n8n_nodes folder:', n8nNodesPath);
+
+          // Remove unnecessary files/folders
+          const toRemove = [
+            'node_modules',
+            'nodes', // TypeScript source files
+            'lib', // TypeScript source files (we keep dist/lib)
+            'eslint.config.mjs',
+            'tsconfig.json',
+            'package-lock.json',
+          ];
+
+          for (const item of toRemove) {
+            const itemPath = path.join(n8nNodesPath, item);
+            if (fs.existsSync(itemPath)) {
+              fs.rmSync(itemPath, { recursive: true, force: true });
+              console.log(`  Removed: ${item}`);
+            }
+          }
+        }
+      }
+    },
+  },
 };
 
 export default config;
