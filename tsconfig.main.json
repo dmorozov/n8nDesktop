@@ -7,5 +7,5 @@
     "outDir": "./dist/main",
     "noEmit": false
   },
-  "include": ["src/main/**/*"]
+  "include": ["src/main/**/*", "src/shared/**/*"]
 }

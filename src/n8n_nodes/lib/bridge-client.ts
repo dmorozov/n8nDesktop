@@ -218,3 +218,241 @@ export function isBridgeUnavailableError(error: unknown): boolean {
   }
   return false;
 }
+
+// ============================================================================
+// Workflow Execution Popup Support (Feature: 010-workflow-execution-popup)
+// ============================================================================
+
+/**
+ * External input configuration for nodes from the popup
+ */
+export interface IExternalNodeConfig {
+  nodeId: string;
+  nodeType: 'promptInput' | 'fileSelector';
+  value: string | IExternalFileReference[];
+}
+
+/**
+ * External file reference from popup
+ */
+export interface IExternalFileReference {
+  id: string;
+  path: string;
+  name: string;
+  size: number;
+  mimeType: string;
+}
+
+/**
+ * Get external configuration for a node from the popup
+ * Returns null if no external config is available (fallback to internal state)
+ *
+ * @param executionId - The n8n execution ID
+ * @param nodeId - The node ID to get config for
+ * @returns External config or null if not available
+ */
+export async function getExternalNodeConfig(
+  executionId: string,
+  nodeId: string
+): Promise<IExternalNodeConfig | null> {
+  try {
+    const response = await fetch(
+      `${getBridgeUrl()}/api/electron-bridge/execution-config/${executionId}/${nodeId}`,
+      {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+
+    if (response.status === 404) {
+      // No external config - fall back to internal state
+      return null;
+    }
+
+    if (!response.ok) {
+      console.warn(`[BridgeClient] Failed to get external config: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    return data as IExternalNodeConfig;
+  } catch (error) {
+    // Silently fail and fall back to internal state
+    console.warn('[BridgeClient] Error getting external config:', error);
+    return null;
+  }
+}
+
+/**
+ * Execution result to be sent back to the popup
+ */
+export interface IExecutionResult {
+  executionId: string;
+  nodeId: string;
+  nodeName: string;
+  contentType: 'text' | 'markdown' | 'file';
+  content: string;
+  fileReference?: {
+    path: string;
+    name: string;
+    size: number;
+    mimeType: string;
+  };
+}
+
+/**
+ * Post execution result from ResultDisplay node to the popup
+ *
+ * @param result - The execution result to post
+ * @returns True if successful, false otherwise
+ */
+export async function postExecutionResult(result: IExecutionResult): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `${getBridgeUrl()}/api/electron-bridge/execution-result`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(result),
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+
+    if (!response.ok) {
+      console.warn(`[BridgeClient] Failed to post execution result: ${response.status}`);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    // Silently fail - the popup may not be open
+    console.warn('[BridgeClient] Error posting execution result:', error);
+    return false;
+  }
+}
+
+// ============================================================================
+// Node Pre-selected Files Storage (persists across test executions)
+// ============================================================================
+
+/**
+ * File reference structure for storage
+ */
+export interface IStoredFileReference {
+  id: string;
+  originalName: string;
+  originalPath: string;
+  destinationPath: string;
+  size: number;
+  mimeType: string;
+  extension: string;
+  copiedAt: string;
+  hash?: string;
+}
+
+/**
+ * Store pre-selected files for a node via Electron bridge
+ * This persists files even across test executions
+ *
+ * @param workflowId - The workflow ID (can be actual ID or workflow name for unsaved workflows)
+ * @param nodeIdentifier - The node ID or name (unique within workflow)
+ * @param files - Array of file references to store
+ * @returns True if successful, false otherwise
+ */
+export async function storeNodeFiles(
+  workflowId: string,
+  nodeIdentifier: string,
+  files: IStoredFileReference[]
+): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `${getBridgeUrl()}/api/electron-bridge/node-files/${encodeURIComponent(workflowId)}/${encodeURIComponent(nodeIdentifier)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files }),
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+
+    if (!response.ok) {
+      console.warn(`[BridgeClient] Failed to store node files: ${response.status}`);
+      return false;
+    }
+
+    const data = await response.json() as { success: boolean };
+    return data.success;
+  } catch (error) {
+    console.warn('[BridgeClient] Error storing node files:', error);
+    return false;
+  }
+}
+
+/**
+ * Retrieve pre-selected files for a node from Electron bridge
+ *
+ * @param workflowId - The workflow ID
+ * @param nodeIdentifier - The node ID or name
+ * @returns Array of stored file references, or empty array if none
+ */
+export async function getStoredNodeFiles(
+  workflowId: string,
+  nodeIdentifier: string
+): Promise<IStoredFileReference[]> {
+  try {
+    const response = await fetch(
+      `${getBridgeUrl()}/api/electron-bridge/node-files/${encodeURIComponent(workflowId)}/${encodeURIComponent(nodeIdentifier)}`,
+      {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+
+    if (!response.ok) {
+      console.warn(`[BridgeClient] Failed to get stored node files: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json() as { success: boolean; files: IStoredFileReference[] };
+    return data.files || [];
+  } catch (error) {
+    console.warn('[BridgeClient] Error getting stored node files:', error);
+    return [];
+  }
+}
+
+/**
+ * Clear pre-selected files for a node
+ *
+ * @param workflowId - The workflow ID
+ * @param nodeIdentifier - The node ID or name
+ * @returns True if successful, false otherwise
+ */
+export async function clearStoredNodeFiles(
+  workflowId: string,
+  nodeIdentifier: string
+): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `${getBridgeUrl()}/api/electron-bridge/node-files/${encodeURIComponent(workflowId)}/${encodeURIComponent(nodeIdentifier)}`,
+      {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+
+    if (!response.ok) {
+      console.warn(`[BridgeClient] Failed to clear stored node files: ${response.status}`);
+      return false;
+    }
+
+    const data = await response.json() as { success: boolean };
+    return data.success;
+  } catch (error) {
+    console.warn('[BridgeClient] Error clearing stored node files:', error);
+    return false;
+  }
+}

@@ -14,5 +14,5 @@
     },
     "baseUrl": "."
   },
-  "include": ["src/renderer/**/*", "src/preload/types.ts"]
+  "include": ["src/renderer/**/*", "src/preload/types.ts", "src/shared/**/*"]
 }

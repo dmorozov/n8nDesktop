@@ -316,6 +316,130 @@ export interface WorkflowTemplate {
   workflow: Partial<WorkflowData>;
 }
 
+// Workflow Popup Types
+export interface WorkflowPopupFileReference {
+  id: string;
+  path: string;
+  name: string;
+  size: number;
+  mimeType: string;
+  selectedAt: string;
+}
+
+export interface WorkflowPopupOutputFileReference {
+  path: string;
+  name: string;
+  size: number;
+  mimeType: string;
+}
+
+export interface WorkflowPopupInputFieldConfig {
+  nodeId: string;
+  nodeType: 'promptInput' | 'fileSelector';
+  nodeName: string;
+  value: string | WorkflowPopupFileReference[];
+  required: boolean;
+}
+
+export interface WorkflowPopupOutputResult {
+  nodeId: string;
+  nodeName: string;
+  contentType: 'markdown' | 'text' | 'file';
+  content: string;
+  fileReference: WorkflowPopupOutputFileReference | null;
+}
+
+export interface WorkflowPopupExecutionResult {
+  executionId: string;
+  status: 'success' | 'error' | 'timeout';
+  startedAt: string;
+  completedAt: string;
+  durationMs: number;
+  outputs: WorkflowPopupOutputResult[];
+  error: string | null;
+}
+
+export interface WorkflowPopupConfig {
+  workflowId: string;
+  workflowName: string;
+  lastUpdated: string;
+  inputs: Record<string, WorkflowPopupInputFieldConfig>;
+  lastExecution: WorkflowPopupExecutionResult | null;
+}
+
+export interface WorkflowPopupNodeInfo {
+  nodeId: string;
+  nodeName: string;
+  nodeType: string;
+  parameters: Record<string, unknown>;
+}
+
+export interface WorkflowPopupAnalysisResult {
+  workflowId: string;
+  workflowName: string;
+  promptInputNodes: WorkflowPopupNodeInfo[];
+  fileSelectorNodes: WorkflowPopupNodeInfo[];
+  resultDisplayNodes: WorkflowPopupNodeInfo[];
+  isSupported: boolean;
+  error?: string;
+}
+
+export interface WorkflowPopupExecuteRequest {
+  workflowId: string;
+  inputs: Record<string, WorkflowPopupInputFieldConfig>;
+  timeout?: number;
+}
+
+export interface WorkflowPopupExecuteResponse {
+  success: boolean;
+  executionId?: string;
+  error?: string;
+}
+
+export interface WorkflowPopupStatusResponse {
+  executionId: string;
+  status: 'running' | 'success' | 'error' | 'waiting';
+  progress?: number;
+  result?: WorkflowPopupExecutionResult;
+}
+
+export interface WorkflowPopupFileSelectOptions {
+  title?: string;
+  filters?: Array<{ name: string; extensions: string[] }>;
+  defaultPath?: string;
+  multiSelect?: boolean;
+}
+
+export interface WorkflowPopupFileSelectResult {
+  cancelled: boolean;
+  filePaths: string[];
+  files: WorkflowPopupFileReference[];
+}
+
+export interface WorkflowPopupFileSaveOptions {
+  title?: string;
+  defaultPath?: string;
+  filters?: Array<{ name: string; extensions: string[] }>;
+}
+
+export interface WorkflowPopupFileSaveResult {
+  cancelled: boolean;
+  filePath?: string;
+}
+
+export interface WorkflowPopupAPI {
+  analyze: (workflowId: string) => Promise<WorkflowPopupAnalysisResult>;
+  getConfig: (workflowId: string) => Promise<WorkflowPopupConfig | null>;
+  saveConfig: (config: WorkflowPopupConfig) => Promise<{ success: boolean }>;
+  deleteConfig: (workflowId: string) => Promise<{ success: boolean }>;
+  execute: (request: WorkflowPopupExecuteRequest) => Promise<WorkflowPopupExecuteResponse>;
+  status: (executionId: string) => Promise<WorkflowPopupStatusResponse>;
+  cancel: (executionId: string) => Promise<{ success: boolean }>;
+  selectFiles: (options: WorkflowPopupFileSelectOptions) => Promise<WorkflowPopupFileSelectResult>;
+  saveFile: (options: WorkflowPopupFileSaveOptions) => Promise<WorkflowPopupFileSaveResult>;
+  copyOutputFile: (sourcePath: string, destinationPath: string) => Promise<{ success: boolean; error?: string }>;
+}
+
 // API exposed to renderer
 export interface ElectronAPI {
   // n8n management
@@ -422,6 +546,9 @@ export interface ElectronAPI {
     onUpdateAvailable: (callback: (info: UpdateInfo) => void) => () => void;
     onUpdateDismissed: (callback: () => void) => () => void;
   };
+
+  // Workflow Execution Popup
+  workflowPopup: WorkflowPopupAPI;
 
   // Docling OCR service
   docling: {

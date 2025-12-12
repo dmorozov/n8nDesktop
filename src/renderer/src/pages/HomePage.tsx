@@ -16,6 +16,7 @@ import { WorkflowHorizontalList } from '@/components/features/workflows/Workflow
 import { CreateWorkflowSection } from '@/components/features/workflows/CreateWorkflowSection';
 import { EmptyWorkflowsState } from '@/components/features/workflows/EmptyWorkflowsState';
 import { DeleteConfirmDialog } from '@/components/features/workflows/DeleteConfirmDialog';
+import { WorkflowExecutionPopup } from '@/components/features/workflow-popup';
 import { WorkflowCardSkeleton } from '@/components/ui/loading-spinner';
 import {
   $workflows,
@@ -51,6 +52,10 @@ export function HomePage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [workflowToDelete, setWorkflowToDelete] = useState<Workflow | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Popup state (FR-001)
+  const [popupWorkflow, setPopupWorkflow] = useState<Workflow | null>(null);
+  const [popupOpen, setPopupOpen] = useState(false);
 
   // Load workflows when n8n is ready or on mount if already ready
   useEffect(() => {
@@ -216,6 +221,20 @@ export function HomePage() {
   const handleCancelDelete = useCallback(() => {
     setDeleteDialogOpen(false);
     setWorkflowToDelete(null);
+  }, []);
+
+  // Open popup for workflow execution (FR-001)
+  const handleOpenPopup = useCallback((workflow: Workflow) => {
+    setPopupWorkflow(workflow);
+    setPopupOpen(true);
+  }, []);
+
+  // Handle popup close
+  const handlePopupOpenChange = useCallback((open: boolean) => {
+    setPopupOpen(open);
+    if (!open) {
+      setPopupWorkflow(null);
+    }
   }, []);
 
   const handleExport = useCallback(async (workflow: Workflow) => {
@@ -495,6 +514,7 @@ export function HomePage() {
             runningWorkflowIds={runningWorkflowIds}
             onRun={handleRun}
             onEdit={handleEdit}
+            onOpenPopup={handleOpenPopup}
             onDuplicate={handleDuplicate}
             onDelete={handleDelete}
             onExport={handleExport}
@@ -524,6 +544,20 @@ export function HomePage() {
         onConfirm={handleConfirmDelete}
         onCancel={handleCancelDelete}
         isLoading={isDeleting}
+      />
+
+      {/* Workflow Execution Popup (FR-001) */}
+      <WorkflowExecutionPopup
+        workflowId={popupWorkflow?.id ?? null}
+        workflowName={popupWorkflow?.name}
+        open={popupOpen}
+        onOpenChange={handlePopupOpenChange}
+        onEditWorkflow={handleEdit ? (id) => {
+          const workflow = workflows.find(w => w.id === id);
+          if (workflow) {
+            handleEdit(workflow);
+          }
+        } : undefined}
       />
     </div>
   );

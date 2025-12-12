@@ -11,32 +11,22 @@
         "name": "When clicking 'Test workflow'",
         "type": "n8n-nodes-base.manualTrigger",
         "typeVersion": 1,
-        "position": [
-          240,
-          304
-        ]
+        "position": [240, 304]
       },
       {
         "parameters": {
-          "assignments": {
-            "assignments": [
-              {
-                "id": "prompt-input",
-                "name": "chatInput",
-                "value": "Please tell me a joke",
-                "type": "string"
-              }
-            ]
-          },
-          "options": {}
+          "prompt": "<p>Please tell me a joke</p>",
+          "options": {
+            "stripHtml": true,
+            "trimWhitespace": true
+          }
         },
-        "name": "User Prompt",
-        "type": "n8n-nodes-base.set",
-        "typeVersion": 3.4,
-        "position": [
-          464,
-          304
-        ]
+        "name": "Prompt Input",
+        "type": "CUSTOM.promptInput",
+        "typeVersion": 1,
+        "position": [460, 304],
+        "notesInFlow": true,
+        "notes": "Enter your prompt here or use the popup execution dialog"
       },
       {
         "parameters": {
@@ -45,10 +35,7 @@
         "name": "AI Agent",
         "type": "@n8n/n8n-nodes-langchain.agent",
         "typeVersion": 1.7,
-        "position": [
-          688,
-          224
-        ]
+        "position": [680, 224]
       },
       {
         "parameters": {
@@ -67,10 +54,7 @@
         "name": "Show Result",
         "type": "n8n-nodes-base.set",
         "typeVersion": 3.4,
-        "position": [
-          1024,
-          256
-        ]
+        "position": [900, 256]
       }
     ],
     "pinData": {},
@@ -79,14 +63,14 @@
         "main": [
           [
             {
-              "node": "User Prompt",
+              "node": "Prompt Input",
               "type": "main",
               "index": 0
             }
           ]
         ]
       },
-      "User Prompt": {
+      "Prompt Input": {
         "main": [
           [
             {

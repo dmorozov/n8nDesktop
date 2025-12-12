@@ -33,6 +33,25 @@ interface IFileReference {
 let bridgeServer: http.Server | null = null;
 let bridgePort = DEFAULT_BRIDGE_PORT;
 
+/** In-memory store for execution configs (for workflow popup) */
+const executionConfigs = new Map<string, Record<string, {
+  nodeId: string;
+  nodeType: 'promptInput' | 'fileSelector';
+  value: string | IFileReference[];
+}>>();
+
+/** In-memory store for execution results (from ResultDisplay nodes) */
+const executionResults = new Map<string, Array<{
+  nodeId: string;
+  nodeName: string;
+  contentType: 'markdown' | 'text' | 'file';
+  content: string;
+  fileReference: { path: string; name: string; size: number; mimeType: string } | null;
+}>>();
+
+/** In-memory store for node pre-selected files (persists across test executions) */
+const nodeStoredFiles = new Map<string, IFileReference[]>();
+
 /**
  * Get MIME type from file extension
  */
@@ -120,7 +139,7 @@ function sendJsonResponse(
   res.writeHead(statusCode, {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   });
   res.end(JSON.stringify(data));
@@ -332,6 +351,379 @@ function handleDataFolder(
   });
 }
 
+// ============================================================================
+// Execution Config Handlers (for workflow popup)
+// ============================================================================
+
+/**
+ * Handle POST /api/electron-bridge/execution-config
+ * Store execution config before starting workflow
+ * Note: Uses workflowId as the key (not executionId) because nodes can't access
+ * our popup execution ID, but they can access the workflow ID via this.getWorkflow().id
+ */
+async function handleSetExecutionConfig(
+  req: http.IncomingMessage,
+  res: http.ServerResponse
+): Promise<void> {
+  try {
+    const body = (await parseRequestBody(req)) as {
+      executionId: string;  // Actually workflowId now, keeping param name for compatibility
+      configs: Record<string, {
+        nodeId: string;
+        nodeType: 'promptInput' | 'fileSelector';
+        value: string | IFileReference[];
+      }>;
+    };
+
+    if (!body.executionId || !body.configs) {
+      sendJsonResponse(res, 400, {
+        success: false,
+        error: 'Missing executionId (workflowId) or configs',
+      });
+      return;
+    }
+
+    // Store with workflowId as key
+    executionConfigs.set(body.executionId, body.configs);
+    console.log(`[Electron Bridge] Stored execution config for workflow ${body.executionId}`);
+
+    sendJsonResponse(res, 200, { success: true });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[Electron Bridge] Set execution config error:', err);
+    sendJsonResponse(res, 500, {
+      success: false,
+      error: err.message,
+    });
+  }
+}
+
+/**
+ * Handle GET /api/electron-bridge/execution-config/:executionId/:nodeId
+ * Retrieve external input config for a node during execution
+ */
+function handleGetExecutionConfig(
+  pathname: string,
+  res: http.ServerResponse
+): void {
+  try {
+    // Parse path: /api/electron-bridge/execution-config/:executionId/:nodeId
+    const parts = pathname.split('/').filter(Boolean);
+    const executionId = parts[3]; // index 3 after api/electron-bridge/execution-config
+    const nodeId = parts[4];
+
+    if (!executionId) {
+      sendJsonResponse(res, 400, {
+        success: false,
+        error: 'Missing executionId',
+      });
+      return;
+    }
+
+    const configs = executionConfigs.get(executionId);
+
+    if (!configs) {
+      sendJsonResponse(res, 200, {
+        success: true,
+        hasExternalConfig: false,
+      });
+      return;
+    }
+
+    if (nodeId) {
+      // Return specific node config
+      const nodeConfig = configs[nodeId];
+      if (nodeConfig) {
+        sendJsonResponse(res, 200, {
+          success: true,
+          hasExternalConfig: true,
+          config: nodeConfig,
+        });
+      } else {
+        sendJsonResponse(res, 200, {
+          success: true,
+          hasExternalConfig: false,
+        });
+      }
+    } else {
+      // Return all configs for execution
+      sendJsonResponse(res, 200, {
+        success: true,
+        hasExternalConfig: true,
+        configs,
+      });
+    }
+  } catch (error) {
+    const err = error as Error;
+    console.error('[Electron Bridge] Get execution config error:', err);
+    sendJsonResponse(res, 500, {
+      success: false,
+      error: err.message,
+    });
+  }
+}
+
+/**
+ * Handle DELETE /api/electron-bridge/execution-config/:executionId
+ * Clean up execution config after workflow completes
+ */
+function handleDeleteExecutionConfig(
+  pathname: string,
+  res: http.ServerResponse
+): void {
+  try {
+    // Parse path: /api/electron-bridge/execution-config/:executionId
+    const parts = pathname.split('/').filter(Boolean);
+    const executionId = parts[3];
+
+    if (!executionId) {
+      sendJsonResponse(res, 400, {
+        success: false,
+        error: 'Missing executionId',
+      });
+      return;
+    }
+
+    executionConfigs.delete(executionId);
+    executionResults.delete(executionId);
+    console.log(`[Electron Bridge] Deleted execution config for ${executionId}`);
+
+    sendJsonResponse(res, 200, { success: true });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[Electron Bridge] Delete execution config error:', err);
+    sendJsonResponse(res, 500, {
+      success: false,
+      error: err.message,
+    });
+  }
+}
+
+/**
+ * Handle POST /api/electron-bridge/execution-result
+ * Store result from ResultDisplay node during execution
+ */
+async function handleStoreExecutionResult(
+  req: http.IncomingMessage,
+  res: http.ServerResponse
+): Promise<void> {
+  try {
+    const body = (await parseRequestBody(req)) as {
+      executionId: string;
+      nodeId: string;
+      result: {
+        nodeId: string;
+        nodeName: string;
+        contentType: 'markdown' | 'text' | 'file';
+        content: string;
+        fileReference: { path: string; name: string; size: number; mimeType: string } | null;
+      };
+    };
+
+    if (!body.executionId || !body.result) {
+      sendJsonResponse(res, 400, {
+        success: false,
+        error: 'Missing executionId or result',
+      });
+      return;
+    }
+
+    // Get or create results array for this execution
+    const results = executionResults.get(body.executionId) || [];
+    results.push(body.result);
+    executionResults.set(body.executionId, results);
+
+    console.log(`[Electron Bridge] Stored execution result for ${body.executionId}/${body.nodeId}`);
+
+    sendJsonResponse(res, 200, { success: true });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[Electron Bridge] Store execution result error:', err);
+    sendJsonResponse(res, 500, {
+      success: false,
+      error: err.message,
+    });
+  }
+}
+
+/**
+ * Handle GET /api/electron-bridge/execution-results/:executionId
+ * Retrieve all stored results for an execution
+ */
+function handleGetExecutionResults(
+  pathname: string,
+  res: http.ServerResponse
+): void {
+  try {
+    // Parse path: /api/electron-bridge/execution-results/:executionId
+    const parts = pathname.split('/').filter(Boolean);
+    const executionId = parts[3];
+
+    if (!executionId) {
+      sendJsonResponse(res, 400, {
+        success: false,
+        error: 'Missing executionId',
+      });
+      return;
+    }
+
+    const results = executionResults.get(executionId) || [];
+
+    sendJsonResponse(res, 200, {
+      success: true,
+      results,
+    });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[Electron Bridge] Get execution results error:', err);
+    sendJsonResponse(res, 500, {
+      success: false,
+      error: err.message,
+    });
+  }
+}
+
+// ============================================================================
+// Node Stored Files Handlers (persist across test executions)
+// ============================================================================
+
+/**
+ * Generate storage key for node files
+ */
+function getNodeFilesKey(workflowId: string, nodeIdentifier: string): string {
+  return `${workflowId}:${nodeIdentifier}`;
+}
+
+/**
+ * Handle POST /api/electron-bridge/node-files/:workflowId/:nodeIdentifier
+ * Store pre-selected files for a node (persists across test executions)
+ */
+async function handleSetNodeFiles(
+  req: http.IncomingMessage,
+  pathname: string,
+  res: http.ServerResponse
+): Promise<void> {
+  try {
+    // Parse path: /api/electron-bridge/node-files/:workflowId/:nodeIdentifier
+    const parts = pathname.split('/').filter(Boolean);
+    const workflowId = parts[3];
+    const nodeIdentifier = decodeURIComponent(parts[4] || '');
+
+    if (!workflowId || !nodeIdentifier) {
+      sendJsonResponse(res, 400, {
+        success: false,
+        error: 'Missing workflowId or nodeIdentifier',
+      });
+      return;
+    }
+
+    const body = (await parseRequestBody(req)) as {
+      files: IFileReference[];
+    };
+
+    if (!Array.isArray(body.files)) {
+      sendJsonResponse(res, 400, {
+        success: false,
+        error: 'Missing or invalid files array',
+      });
+      return;
+    }
+
+    const key = getNodeFilesKey(workflowId, nodeIdentifier);
+    nodeStoredFiles.set(key, body.files);
+    console.log(`[Electron Bridge] Stored ${body.files.length} files for ${key}`);
+
+    sendJsonResponse(res, 200, { success: true, fileCount: body.files.length });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[Electron Bridge] Set node files error:', err);
+    sendJsonResponse(res, 500, {
+      success: false,
+      error: err.message,
+    });
+  }
+}
+
+/**
+ * Handle GET /api/electron-bridge/node-files/:workflowId/:nodeIdentifier
+ * Retrieve stored files for a node
+ */
+function handleGetNodeFiles(
+  pathname: string,
+  res: http.ServerResponse
+): void {
+  try {
+    // Parse path: /api/electron-bridge/node-files/:workflowId/:nodeIdentifier
+    const parts = pathname.split('/').filter(Boolean);
+    const workflowId = parts[3];
+    const nodeIdentifier = decodeURIComponent(parts[4] || '');
+
+    if (!workflowId || !nodeIdentifier) {
+      sendJsonResponse(res, 400, {
+        success: false,
+        error: 'Missing workflowId or nodeIdentifier',
+      });
+      return;
+    }
+
+    const key = getNodeFilesKey(workflowId, nodeIdentifier);
+    const files = nodeStoredFiles.get(key) || [];
+
+    console.log(`[Electron Bridge] Retrieved ${files.length} files for ${key}`);
+
+    sendJsonResponse(res, 200, {
+      success: true,
+      files,
+      fileCount: files.length,
+    });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[Electron Bridge] Get node files error:', err);
+    sendJsonResponse(res, 500, {
+      success: false,
+      error: err.message,
+    });
+  }
+}
+
+/**
+ * Handle DELETE /api/electron-bridge/node-files/:workflowId/:nodeIdentifier
+ * Clear stored files for a node
+ */
+function handleDeleteNodeFiles(
+  pathname: string,
+  res: http.ServerResponse
+): void {
+  try {
+    // Parse path: /api/electron-bridge/node-files/:workflowId/:nodeIdentifier
+    const parts = pathname.split('/').filter(Boolean);
+    const workflowId = parts[3];
+    const nodeIdentifier = decodeURIComponent(parts[4] || '');
+
+    if (!workflowId || !nodeIdentifier) {
+      sendJsonResponse(res, 400, {
+        success: false,
+        error: 'Missing workflowId or nodeIdentifier',
+      });
+      return;
+    }
+
+    const key = getNodeFilesKey(workflowId, nodeIdentifier);
+    const deleted = nodeStoredFiles.delete(key);
+
+    console.log(`[Electron Bridge] Deleted stored files for ${key}: ${deleted}`);
+
+    sendJsonResponse(res, 200, { success: true, deleted });
+  } catch (error) {
+    const err = error as Error;
+    console.error('[Electron Bridge] Delete node files error:', err);
+    sendJsonResponse(res, 500, {
+      success: false,
+      error: err.message,
+    });
+  }
+}
+
 /**
  * Start the Electron bridge HTTP server
  */
@@ -354,7 +746,7 @@ export function startElectronBridge(
       if (req.method === 'OPTIONS') {
         res.writeHead(204, {
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type',
         });
         res.end();
@@ -382,6 +774,52 @@ export function startElectronBridge(
           req.method === 'GET'
         ) {
           handleDataFolder(res, configManager);
+        }
+        // ==================== EXECUTION CONFIG ENDPOINTS ====================
+        else if (
+          pathname === '/api/electron-bridge/execution-config' &&
+          req.method === 'POST'
+        ) {
+          await handleSetExecutionConfig(req, res);
+        } else if (
+          pathname.startsWith('/api/electron-bridge/execution-config/') &&
+          req.method === 'GET'
+        ) {
+          handleGetExecutionConfig(pathname, res);
+        } else if (
+          pathname.startsWith('/api/electron-bridge/execution-config/') &&
+          req.method === 'DELETE'
+        ) {
+          handleDeleteExecutionConfig(pathname, res);
+        }
+        // ==================== EXECUTION RESULT ENDPOINTS ====================
+        else if (
+          pathname === '/api/electron-bridge/execution-result' &&
+          req.method === 'POST'
+        ) {
+          await handleStoreExecutionResult(req, res);
+        } else if (
+          pathname.startsWith('/api/electron-bridge/execution-results/') &&
+          req.method === 'GET'
+        ) {
+          handleGetExecutionResults(pathname, res);
+        }
+        // ==================== NODE STORED FILES ENDPOINTS ====================
+        else if (
+          pathname.startsWith('/api/electron-bridge/node-files/') &&
+          req.method === 'POST'
+        ) {
+          await handleSetNodeFiles(req, pathname, res);
+        } else if (
+          pathname.startsWith('/api/electron-bridge/node-files/') &&
+          req.method === 'GET'
+        ) {
+          handleGetNodeFiles(pathname, res);
+        } else if (
+          pathname.startsWith('/api/electron-bridge/node-files/') &&
+          req.method === 'DELETE'
+        ) {
+          handleDeleteNodeFiles(pathname, res);
         } else {
           sendJsonResponse(res, 404, {
             success: false,

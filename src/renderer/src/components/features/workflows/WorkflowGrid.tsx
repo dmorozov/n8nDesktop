@@ -6,6 +6,7 @@ interface WorkflowGridProps {
   runningWorkflowIds?: Set<string>;
   onRun?: (workflow: Workflow) => void;
   onEdit?: (workflow: Workflow) => void;
+  onOpenPopup?: (workflow: Workflow) => void;
   onDuplicate?: (workflow: Workflow) => void;
   onDelete?: (workflow: Workflow) => void;
   onExport?: (workflow: Workflow) => void;
@@ -16,6 +17,7 @@ export function WorkflowGrid({
   runningWorkflowIds = new Set(),
   onRun,
   onEdit,
+  onOpenPopup,
   onDuplicate,
   onDelete,
   onExport,
@@ -29,6 +31,7 @@ export function WorkflowGrid({
           isRunning={runningWorkflowIds.has(workflow.id)}
           onRun={onRun}
           onEdit={onEdit}
+          onOpenPopup={onOpenPopup}
           onDuplicate={onDuplicate}
           onDelete={onDelete}
           onExport={onExport}

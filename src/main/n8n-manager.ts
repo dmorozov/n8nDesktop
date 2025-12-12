@@ -82,8 +82,8 @@ function findN8nBinary(): string {
 
 /**
  * Find the path to the custom n8n nodes directory.
- * In development, it's in src/n8n_nodes/dist/
- * In production (packaged app), it's in resources/app.asar.unpacked/src/n8n_nodes/dist/
+ * In development, it's in src/n8n_nodes/
+ * In production (packaged app), it's in resources/n8n_nodes/ (via extraResource in forge.config)
  */
 function findCustomNodesPath(): string | null {
   const isPackaged = app.isPackaged;
@@ -92,25 +92,23 @@ function findCustomNodesPath(): string | null {
   const possiblePaths: string[] = [];
 
   if (isPackaged) {
-    // In production, check unpacked resources
+    // In production, extraResource copies src/n8n_nodes to resources/n8n_nodes
     const resourcesPath = process.resourcesPath;
     possiblePaths.push(
-      path.join(resourcesPath, 'app.asar.unpacked', 'src', 'n8n_nodes', 'dist'),
+      // extraResource places the folder directly in resources/ with original folder name
+      path.join(resourcesPath, 'n8n_nodes'),
+      // Fallback paths in case of different packaging configurations
+      path.join(resourcesPath, 'src', 'n8n_nodes'),
       path.join(resourcesPath, 'app.asar.unpacked', 'src', 'n8n_nodes'),
-      path.join(resourcesPath, 'app', 'src', 'n8n_nodes', 'dist'),
-      path.join(resourcesPath, 'app', 'src', 'n8n_nodes'),
     );
   } else {
     // In development, app.getAppPath() returns the project root
     // Note: In Vite dev mode, this might return .vite/build, so we need to check parent directories too
     const appPath = app.getAppPath();
     possiblePaths.push(
-      path.join(appPath, 'src', 'n8n_nodes', 'dist'),
       path.join(appPath, 'src', 'n8n_nodes'),
       // Fallback for Vite dev mode where appPath might be .vite/build
-      path.join(appPath, '..', '..', 'src', 'n8n_nodes', 'dist'),
       path.join(appPath, '..', '..', 'src', 'n8n_nodes'),
-      path.join(appPath, '..', '..', '..', 'src', 'n8n_nodes', 'dist'),
       path.join(appPath, '..', '..', '..', 'src', 'n8n_nodes'),
     );
   }
@@ -192,6 +190,87 @@ export class N8nManager extends EventEmitter {
     const customNodesPath = findCustomNodesPath();
     if (customNodesPath) {
       this.addLog(`Custom n8n nodes found at: ${customNodesPath}`);
+
+      // Also copy nodes to ~/.n8n/custom/ for maximum compatibility
+      // n8n looks for custom nodes in this location by default
+      const customDir = path.join(n8nFolder, 'custom');
+      const customNodesDir = path.join(customDir, 'nodes');
+      const sourceNodesDir = path.join(customNodesPath, 'dist', 'nodes');
+
+      if (fs.existsSync(sourceNodesDir)) {
+        // Create custom/nodes directory if it doesn't exist
+        if (!fs.existsSync(customNodesDir)) {
+          fs.mkdirSync(customNodesDir, { recursive: true });
+          this.addLog(`Created custom nodes directory: ${customNodesDir}`);
+        }
+
+        // Copy node folders (PromptInput, FileSelector, ResultDisplay)
+        const nodeFolders = fs.readdirSync(sourceNodesDir);
+        for (const nodeFolder of nodeFolders) {
+          const sourcePath = path.join(sourceNodesDir, nodeFolder);
+          const destPath = path.join(customNodesDir, nodeFolder);
+
+          if (fs.statSync(sourcePath).isDirectory()) {
+            // Only copy if source is newer or destination doesn't exist
+            const sourcePackage = path.join(sourcePath, `${nodeFolder}.node.js`);
+            const destPackage = path.join(destPath, `${nodeFolder}.node.js`);
+
+            let shouldCopy = !fs.existsSync(destPackage);
+            if (!shouldCopy && fs.existsSync(sourcePackage)) {
+              const sourceStat = fs.statSync(sourcePackage);
+              const destStat = fs.statSync(destPackage);
+              shouldCopy = sourceStat.mtimeMs > destStat.mtimeMs;
+            }
+
+            if (shouldCopy) {
+              if (fs.existsSync(destPath)) {
+                fs.rmSync(destPath, { recursive: true, force: true });
+              }
+              fs.cpSync(sourcePath, destPath, { recursive: true });
+              this.addLog(`Copied custom node: ${nodeFolder}`);
+            }
+          }
+        }
+
+        // Also copy lib folder (contains shared types and bridge client)
+        const sourceLibDir = path.join(customNodesPath, 'dist', 'lib');
+        const destLibDir = path.join(customDir, 'lib');
+        if (fs.existsSync(sourceLibDir)) {
+          const sourceLibStat = fs.statSync(path.join(sourceLibDir, 'types.js'));
+          const destLibFile = path.join(destLibDir, 'types.js');
+          const shouldCopyLib = !fs.existsSync(destLibFile) ||
+            sourceLibStat.mtimeMs > fs.statSync(destLibFile).mtimeMs;
+
+          if (shouldCopyLib) {
+            if (fs.existsSync(destLibDir)) {
+              fs.rmSync(destLibDir, { recursive: true, force: true });
+            }
+            fs.cpSync(sourceLibDir, destLibDir, { recursive: true });
+            this.addLog('Copied lib folder for custom nodes');
+          }
+        }
+
+        // Also copy package.json to custom directory root
+        const sourcePackageJson = path.join(customNodesPath, 'package.json');
+        const destPackageJson = path.join(customDir, 'package.json');
+        if (fs.existsSync(sourcePackageJson)) {
+          const sourceStat = fs.statSync(sourcePackageJson);
+          const shouldCopyPackage = !fs.existsSync(destPackageJson) ||
+            sourceStat.mtimeMs > fs.statSync(destPackageJson).mtimeMs;
+
+          if (shouldCopyPackage) {
+            // Modify package.json to point to nodes/ and lib/ instead of dist/nodes/ and dist/lib/
+            const packageData = JSON.parse(fs.readFileSync(sourcePackageJson, 'utf-8'));
+            if (packageData.n8n && packageData.n8n.nodes) {
+              packageData.n8n.nodes = packageData.n8n.nodes.map((nodePath: string) =>
+                nodePath.replace('dist/nodes/', 'nodes/')
+              );
+            }
+            fs.writeFileSync(destPackageJson, JSON.stringify(packageData, null, 2));
+            this.addLog('Copied and modified package.json for custom nodes');
+          }
+        }
+      }
     } else {
       this.addLog('Warning: Custom n8n nodes not found');
     }

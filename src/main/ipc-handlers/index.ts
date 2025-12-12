@@ -4,6 +4,7 @@ import { ConfigManager, AppConfig, AIServiceConfig } from '../config-manager';
 import { showEditor, hideEditor, isEditorShowing } from '../index';
 import { registerWorkflowHandlers } from './workflows';
 import { registerStorageHandlers } from './storage';
+import { registerWorkflowExecutionHandlers } from './workflow-execution';
 import { testConnection, getModels } from '../services/ai-service-tester';
 import { BackupManager } from '../services/backup-manager';
 import { N8nAuthManager } from '../services/n8n-auth-manager';
@@ -561,5 +562,13 @@ export function registerIpcHandlers(
     configManager,
     backupManager,
     () => n8nManager.hasRunningWorkflows()
+  );
+
+  // ==================== REGISTER WORKFLOW EXECUTION HANDLERS ====================
+
+  registerWorkflowExecutionHandlers(
+    ipcMain,
+    () => n8nManager.getPort(),
+    authManager
   );
 }

@@ -5,9 +5,15 @@
 | npm run setup:all         | Installs all dependencies (npm packages + Docling Python deps)         |
 | npm run setup:docling     | Installs Docling Python dependencies using Poetry                      |
 | npm run setup:docling:pip | Alternative: Installs Docling deps using pip (if Poetry not available) |
-| npm run build:all         | Runs setup:all then builds the Electron app                            |
+| npm run build:all         | Runs setup:all, builds n8n-nodes, then builds the Electron app         |
 | npm run clean:all         | Removes all build artifacts and dependencies                           |
 | npm run check:all         | Runs all checks (typecheck, lint, unit tests)                          |
+| npm run make              | creates distributable installers                                       |
+
+  The custom nodes will be:
+  1. Packaged in resources/n8n_nodes/ (minimal size, no dev dependencies)
+  2. Found by the app at runtime
+  3. Copied to ~/.n8n/custom/ so n8n can load them
 
 # Using AI in development
 

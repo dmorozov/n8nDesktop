@@ -6,6 +6,7 @@ import type {
   IDataObject,
 } from 'n8n-workflow';
 import { DEFAULT_CONFIG } from '../../lib/types';
+import { getExternalNodeConfig } from '../../lib/bridge-client';
 
 /**
  * Strip HTML tags from text
@@ -151,10 +152,28 @@ export class PromptInput implements INodeType {
     const items = this.getInputData();
     const returnData: INodeExecutionData[] = [];
 
+    // Get execution context for external config support (FR-022)
+    // Use workflowId as the key (not executionId) because we can't pass our popup
+    // execution ID to n8n, but nodes can access the workflow ID
+    const workflow = this.getWorkflow();
+    const workflowId = workflow.id;
+    const node = this.getNode();
+    const nodeId = node.id || node.name; // Fallback to name if id not available
+
     for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
       try {
         // Get parameters
         let prompt = this.getNodeParameter('prompt', itemIndex, '') as string;
+
+        // Check for external config from popup (FR-022)
+        // This allows the popup to provide prompt text without editing the node
+        if (workflowId && nodeId) {
+          const externalConfig = await getExternalNodeConfig(workflowId, nodeId);
+          if (externalConfig?.nodeType === 'promptInput' && typeof externalConfig.value === 'string') {
+            // Use prompt from popup instead of node parameter
+            prompt = externalConfig.value;
+          }
+        }
         const options = this.getNodeParameter('options', itemIndex, {}) as {
           minLength?: number;
           maxLength?: number;
@@ -184,8 +203,11 @@ export class PromptInput implements INodeType {
         const lineCountValue = countLines(prompt);
 
         // Build output
+        // Include both 'prompt' and 'chatInput' for compatibility with different nodes
+        // AI Agent expects 'chatInput', other nodes may use 'prompt'
         const output: IDataObject = {
           prompt,
+          chatInput: prompt, // For AI Agent compatibility
           length: prompt.length,
           wordCount: wordCountValue,
           lineCount: lineCountValue,
@@ -204,6 +226,7 @@ export class PromptInput implements INodeType {
         if (this.continueOnFail()) {
           const errorOutput: IDataObject = {
             prompt: '',
+            chatInput: '', // For AI Agent compatibility
             length: 0,
             wordCount: 0,
             lineCount: 0,

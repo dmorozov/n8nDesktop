@@ -1,0 +1,37 @@
+{
+  "name": "n8n-nodes-desktop",
+  "version": "1.0.0",
+  "description": "Custom n8n nodes for n8n Desktop application",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc && npm run copy-assets",
+    "copy-assets": "node -e \"const fs=require('fs'),path=require('path');['FileSelector','PromptInput','ResultDisplay'].forEach(n=>{const s=path.join('nodes',n),d=path.join('dist','nodes',n);fs.existsSync(s)&&fs.readdirSync(s).filter(f=>f.endsWith('.json')||f.endsWith('.svg')).forEach(f=>fs.copyFileSync(path.join(s,f),path.join(d,f)))})\"",
+    "dev": "tsc -w",
+    "lint": "eslint nodes/ lib/",
+    "lint:fix": "eslint nodes/ lib/ --fix",
+    "clean": "rm -rf dist"
+  },
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "nodes": [
+      "dist/nodes/PromptInput/PromptInput.node.js",
+      "dist/nodes/FileSelector/FileSelector.node.js",
+      "dist/nodes/ResultDisplay/ResultDisplay.node.js"
+    ],
+    "credentials": []
+  },
+  "dependencies": {
+    "n8n-workflow": "^1.71.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.2",
+    "typescript": "^5.9.3",
+    "eslint": "^9.39.1",
+    "typescript-eslint": "^8.49.0"
+  },
+  "peerDependencies": {
+    "n8n-workflow": ">=1.0.0"
+  }
+}
