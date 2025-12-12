@@ -282,26 +282,16 @@ export class WorkflowExecutor {
       }
 
       // Store execution config in bridge for nodes to fetch
-      const executionId = `popup-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
-      await this.storeExecutionConfig(executionId, request.inputs);
+      // Use workflowId as the key because nodes can access it via this.getWorkflow().id
+      // (nodes can't access our popup execution ID, only n8n's internal execution ID)
+      await this.storeExecutionConfig(request.workflowId, request.inputs);
 
       // Execute workflow via n8n API
+      // Note: n8n expects an empty body for workflow execution
       const response = await axios.post(
         `${this.baseUrl}/workflows/${request.workflowId}/run`,
-        {
-          // Pass execution ID as static data for nodes to access
-          startNodes: [],
-          destinationNode: '',
-          runData: {},
-        },
-        {
-          ...this.getAuthConfig(),
-          params: {
-            // Include execution ID in a way nodes can access
-            popupExecutionId: executionId,
-          },
-        }
+        {},
+        this.getAuthConfig()
       );
 
       const n8nExecutionId = response.data.executionId || response.data.data?.executionId;

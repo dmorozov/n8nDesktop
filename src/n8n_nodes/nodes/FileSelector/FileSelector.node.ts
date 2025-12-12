@@ -137,13 +137,13 @@ export class FileSelector implements INodeType {
     const staticData = this.getWorkflowStaticData('node');
 
     // Get execution context for external config support (FR-021)
-    const executionId = this.getExecutionId();
+    // Use workflowId as the key (not executionId) because we can't pass our popup
+    // execution ID to n8n, but nodes can access the workflow ID
     const node = this.getNode();
     const nodeId = node.id;
     const nodeName = node.name;
 
     // Get workflow identifier for bridge storage
-    // Use workflow ID if available, otherwise use a placeholder
     const workflow = this.getWorkflow();
     const workflowId = workflow.id || workflow.name || 'unknown';
     const nodeIdentifier = nodeId || nodeName;
@@ -152,8 +152,8 @@ export class FileSelector implements INodeType {
       try {
         // Priority 1: Check for external config from popup (FR-021)
         // Files passed from the WorkflowExecutionPopup take priority
-        if (executionId && nodeIdentifier) {
-          const externalConfig = await getExternalNodeConfig(executionId, nodeIdentifier);
+        if (workflowId && nodeIdentifier) {
+          const externalConfig = await getExternalNodeConfig(workflowId, nodeIdentifier);
           if (externalConfig?.nodeType === 'fileSelector' && Array.isArray(externalConfig.value) && externalConfig.value.length > 0) {
             // Use files from popup
             const externalFiles = externalConfig.value as IExternalFileReference[];

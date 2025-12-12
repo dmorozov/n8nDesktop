@@ -358,6 +358,8 @@ function handleDataFolder(
 /**
  * Handle POST /api/electron-bridge/execution-config
  * Store execution config before starting workflow
+ * Note: Uses workflowId as the key (not executionId) because nodes can't access
+ * our popup execution ID, but they can access the workflow ID via this.getWorkflow().id
  */
 async function handleSetExecutionConfig(
   req: http.IncomingMessage,
@@ -365,7 +367,7 @@ async function handleSetExecutionConfig(
 ): Promise<void> {
   try {
     const body = (await parseRequestBody(req)) as {
-      executionId: string;
+      executionId: string;  // Actually workflowId now, keeping param name for compatibility
       configs: Record<string, {
         nodeId: string;
         nodeType: 'promptInput' | 'fileSelector';
@@ -376,13 +378,14 @@ async function handleSetExecutionConfig(
     if (!body.executionId || !body.configs) {
       sendJsonResponse(res, 400, {
         success: false,
-        error: 'Missing executionId or configs',
+        error: 'Missing executionId (workflowId) or configs',
       });
       return;
     }
 
+    // Store with workflowId as key
     executionConfigs.set(body.executionId, body.configs);
-    console.log(`[Electron Bridge] Stored execution config for ${body.executionId}`);
+    console.log(`[Electron Bridge] Stored execution config for workflow ${body.executionId}`);
 
     sendJsonResponse(res, 200, { success: true });
   } catch (error) {
