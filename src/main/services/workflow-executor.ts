@@ -67,6 +67,9 @@ interface N8nWorkflow {
   nodes: N8nWorkflowNode[];
   connections: Record<string, unknown>;
   active: boolean;
+  settings?: Record<string, unknown>;
+  staticData?: Record<string, unknown>;
+  pinData?: Record<string, unknown>;
 }
 
 /** Execution from n8n API */
@@ -286,11 +289,57 @@ export class WorkflowExecutor {
       // (nodes can't access our popup execution ID, only n8n's internal execution ID)
       await this.storeExecutionConfig(request.workflowId, request.inputs);
 
+      // First, fetch the workflow data
+      console.log(`[WorkflowExecutor] Fetching workflow data...`);
+      const workflowResponse = await axios.get<N8nWorkflow>(
+        `${this.baseUrl}/workflows/${request.workflowId}`,
+        this.getAuthConfig()
+      );
+
+      // n8n API wraps workflow data in a 'data' property
+      const responseData = workflowResponse.data as N8nWorkflow & { data?: N8nWorkflow };
+      const workflow: N8nWorkflow = responseData.data ? responseData.data : responseData;
+
+      // Find the manual trigger node
+      const triggerNode = workflow.nodes.find(
+        (node) => node.type === 'n8n-nodes-base.manualTrigger'
+      );
+
+      if (!triggerNode) {
+        return {
+          success: false,
+          error: 'No manual trigger node found in workflow. Only workflows with manual triggers can be executed from the popup.',
+        };
+      }
+
+      console.log(`[WorkflowExecutor] Found trigger node: ${triggerNode.name}`);
+
+      // Build the workflow data for execution (IWorkflowBase format)
+      const workflowData = {
+        id: workflow.id,
+        name: workflow.name,
+        nodes: workflow.nodes,
+        connections: workflow.connections,
+        settings: workflow.settings || {},
+        staticData: workflow.staticData || {},
+        pinData: workflow.pinData || {},
+        active: workflow.active,
+      };
+
       // Execute workflow via n8n API
-      // Note: n8n expects an empty body for workflow execution
+      // n8n expects: { workflowData, triggerToStartFrom: { name } }
+      const payload = {
+        workflowData,
+        triggerToStartFrom: {
+          name: triggerNode.name,
+        },
+      };
+
+      console.log(`[WorkflowExecutor] Sending execution request with trigger: ${triggerNode.name}`);
+
       const response = await axios.post(
         `${this.baseUrl}/workflows/${request.workflowId}/run`,
-        {},
+        payload,
         this.getAuthConfig()
       );
 
@@ -306,11 +355,27 @@ export class WorkflowExecutor {
       const message = error instanceof Error ? error.message : 'Failed to execute workflow';
       console.error('[WorkflowExecutor] Execution error:', message);
 
-      // Check if n8n is not running (FR-025)
-      if (axios.isAxiosError(error) && !error.response) {
+      // Log detailed error information from n8n
+      if (axios.isAxiosError(error)) {
+        console.error('[WorkflowExecutor] Axios error details:');
+        console.error('  Status:', error.response?.status);
+        console.error('  StatusText:', error.response?.statusText);
+        console.error('  Response data:', JSON.stringify(error.response?.data, null, 2));
+        console.error('  Request URL:', error.config?.url);
+
+        // Check if n8n is not running (FR-025)
+        if (!error.response) {
+          return {
+            success: false,
+            error: 'n8n server is not running. Please start the server and try again.',
+          };
+        }
+
+        // Extract error message from n8n response
+        const n8nError = error.response?.data?.message || error.response?.data?.error || message;
         return {
           success: false,
-          error: 'n8n server is not running. Please start the server and try again.',
+          error: `n8n error: ${n8nError}`,
         };
       }
 

@@ -153,9 +153,35 @@ export class PromptInput implements INodeType {
     const returnData: INodeExecutionData[] = [];
 
     // Get execution context for external config support (FR-022)
-    const executionId = this.getExecutionId();
-    const node = this.getNode();
-    const nodeId = node.id;
+    // Use workflowId as the key (not executionId) because we can't pass our popup
+    // execution ID to n8n, but nodes can access the workflow ID
+    console.log('[PromptInput] Execute started');
+
+    let workflow;
+    try {
+      workflow = this.getWorkflow();
+      console.log('[PromptInput] Got workflow:', workflow ? 'yes' : 'no');
+      console.log('[PromptInput] Workflow id:', workflow?.id);
+      console.log('[PromptInput] Workflow name:', workflow?.name);
+    } catch (e) {
+      console.error('[PromptInput] Error getting workflow:', e);
+    }
+
+    const workflowId = workflow?.id;
+
+    let node;
+    try {
+      node = this.getNode();
+      console.log('[PromptInput] Got node:', node ? 'yes' : 'no');
+      console.log('[PromptInput] Node id:', node?.id);
+      console.log('[PromptInput] Node name:', node?.name);
+    } catch (e) {
+      console.error('[PromptInput] Error getting node:', e);
+    }
+
+    const nodeId = node?.id || node?.name; // Fallback to name if id not available
+    console.log('[PromptInput] Using workflowId:', workflowId);
+    console.log('[PromptInput] Using nodeId:', nodeId);
 
     for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
       try {
@@ -164,8 +190,10 @@ export class PromptInput implements INodeType {
 
         // Check for external config from popup (FR-022)
         // This allows the popup to provide prompt text without editing the node
-        if (executionId && nodeId) {
-          const externalConfig = await getExternalNodeConfig(executionId, nodeId);
+        if (workflowId && nodeId) {
+          console.log('[PromptInput] Fetching external config for', workflowId, nodeId);
+          const externalConfig = await getExternalNodeConfig(workflowId, nodeId);
+          console.log('[PromptInput] External config result:', externalConfig);
           if (externalConfig?.nodeType === 'promptInput' && typeof externalConfig.value === 'string') {
             // Use prompt from popup instead of node parameter
             prompt = externalConfig.value;
