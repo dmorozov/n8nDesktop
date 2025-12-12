@@ -53,7 +53,7 @@ function isCustomNodeType(nodeType: string, suffix: string): boolean {
 
 /** Workflow node from n8n API */
 interface N8nWorkflowNode {
-  id: string;
+  id?: string;  // ID may be undefined in some n8n versions
   name: string;
   type: string;
   position: [number, number];
@@ -117,35 +117,87 @@ export class WorkflowExecutor {
    */
   async analyzeWorkflow(workflowId: string): Promise<WorkflowAnalysisResult> {
     try {
-      console.log(`[WorkflowExecutor] Analyzing workflow ${workflowId}`);
+      console.log(`[WorkflowExecutor] ========== ANALYZE WORKFLOW START ==========`);
+      console.log(`[WorkflowExecutor] Analyzing workflow ID: "${workflowId}"`);
+      console.log(`[WorkflowExecutor] API URL: ${this.baseUrl}/workflows/${workflowId}`);
+
+      const authConfig = this.getAuthConfig();
+      console.log(`[WorkflowExecutor] Auth headers present: ${!!authConfig.headers}`);
 
       const response = await axios.get<N8nWorkflow>(
         `${this.baseUrl}/workflows/${workflowId}`,
-        this.getAuthConfig()
+        authConfig
       );
 
-      const workflow = response.data;
+      console.log(`[WorkflowExecutor] API response status: ${response.status}`);
+      console.log(`[WorkflowExecutor] API response data keys: ${Object.keys(response.data || {}).join(', ')}`);
+
+      // n8n API wraps workflow data in a 'data' property
+      // Handle both wrapped { data: {...} } and direct workflow response formats
+      const responseData = response.data as N8nWorkflow & { data?: N8nWorkflow };
+      const workflow: N8nWorkflow = responseData.data ? responseData.data : responseData;
+
+      console.log(`[WorkflowExecutor] Unwrapped workflow keys: ${Object.keys(workflow || {}).join(', ')}`);
+
       const nodes = workflow.nodes || [];
+
+      // Log all node types for debugging
+      console.log(`[WorkflowExecutor] Workflow name: "${workflow.name}"`);
+      console.log(`[WorkflowExecutor] Total nodes count: ${nodes.length}`);
+      console.log(`[WorkflowExecutor] All nodes in workflow:`);
+      nodes.forEach((node, index) => {
+        console.log(`  [${index}] name="${node.name}", id="${node.id || 'none'}", type="${node.type}"`);
+      });
+
+      // Log what we're looking for
+      console.log(`[WorkflowExecutor] Looking for node types:`);
+      console.log(`  - CUSTOM.${NODE_TYPE_SUFFIXES.promptInput}`);
+      console.log(`  - n8n-nodes-desktop.${NODE_TYPE_SUFFIXES.promptInput}`);
+      console.log(`  - CUSTOM.${NODE_TYPE_SUFFIXES.fileSelector}`);
+      console.log(`  - n8n-nodes-desktop.${NODE_TYPE_SUFFIXES.fileSelector}`);
 
       // Detect custom nodes by type (supports both CUSTOM.* and n8n-nodes-desktop.* prefixes)
       const promptInputNodes = nodes
-        .filter((node) => isCustomNodeType(node.type, NODE_TYPE_SUFFIXES.promptInput))
-        .map(this.mapNodeToInfo);
+        .filter((node) => {
+          const isMatch = isCustomNodeType(node.type, NODE_TYPE_SUFFIXES.promptInput);
+          if (isMatch) {
+            console.log(`[WorkflowExecutor] MATCH: "${node.name}" matches promptInput`);
+          }
+          return isMatch;
+        })
+        .map((node) => this.mapNodeToInfo(node));
 
       const fileSelectorNodes = nodes
-        .filter((node) => isCustomNodeType(node.type, NODE_TYPE_SUFFIXES.fileSelector))
-        .map(this.mapNodeToInfo);
+        .filter((node) => {
+          const isMatch = isCustomNodeType(node.type, NODE_TYPE_SUFFIXES.fileSelector);
+          if (isMatch) {
+            console.log(`[WorkflowExecutor] MATCH: "${node.name}" matches fileSelector`);
+          }
+          return isMatch;
+        })
+        .map((node) => this.mapNodeToInfo(node));
 
       const resultDisplayNodes = nodes
-        .filter((node) => isCustomNodeType(node.type, NODE_TYPE_SUFFIXES.resultDisplay))
-        .map(this.mapNodeToInfo);
+        .filter((node) => {
+          const isMatch = isCustomNodeType(node.type, NODE_TYPE_SUFFIXES.resultDisplay);
+          if (isMatch) {
+            console.log(`[WorkflowExecutor] MATCH: "${node.name}" matches resultDisplay`);
+          }
+          return isMatch;
+        })
+        .map((node) => this.mapNodeToInfo(node));
 
       const isSupported =
         promptInputNodes.length > 0 ||
         fileSelectorNodes.length > 0 ||
         resultDisplayNodes.length > 0;
 
-      console.log(`[WorkflowExecutor] Found ${promptInputNodes.length} promptInput, ${fileSelectorNodes.length} fileSelector, ${resultDisplayNodes.length} resultDisplay nodes`);
+      console.log(`[WorkflowExecutor] ========== ANALYSIS RESULTS ==========`);
+      console.log(`[WorkflowExecutor] promptInputNodes: ${promptInputNodes.length}`);
+      console.log(`[WorkflowExecutor] fileSelectorNodes: ${fileSelectorNodes.length}`);
+      console.log(`[WorkflowExecutor] resultDisplayNodes: ${resultDisplayNodes.length}`);
+      console.log(`[WorkflowExecutor] isSupported: ${isSupported}`);
+      console.log(`[WorkflowExecutor] ========== ANALYZE WORKFLOW END ==========`);
 
       return {
         workflowId,
@@ -157,7 +209,16 @@ export class WorkflowExecutor {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to analyze workflow';
-      console.error('[WorkflowExecutor] Analysis error:', message);
+      console.error('[WorkflowExecutor] ========== ANALYSIS ERROR ==========');
+      console.error('[WorkflowExecutor] Error:', error);
+      console.error('[WorkflowExecutor] Message:', message);
+      if (axios.isAxiosError(error)) {
+        console.error('[WorkflowExecutor] Axios error details:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+        });
+      }
       return {
         workflowId,
         workflowName: '',
@@ -172,7 +233,9 @@ export class WorkflowExecutor {
 
   private mapNodeToInfo(node: N8nWorkflowNode): WorkflowNodeInfo {
     return {
-      nodeId: node.id,
+      // Use node.id if available, otherwise fall back to node.name as unique identifier
+      // Some n8n versions don't return id for nodes, but name is always unique within a workflow
+      nodeId: node.id || node.name,
       nodeName: node.name,
       nodeType: node.type,
       parameters: node.parameters,

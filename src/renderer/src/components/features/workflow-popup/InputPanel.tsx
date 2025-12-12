@@ -37,8 +37,15 @@ export function InputPanel({
 }: InputPanelProps) {
   const inputList = Object.values(inputs);
 
+  // Debug logging
+  console.log(`[InputPanel] ========== RENDER ==========`);
+  console.log(`[InputPanel] inputs keys:`, Object.keys(inputs));
+  console.log(`[InputPanel] inputList length: ${inputList.length}`);
+  console.log(`[InputPanel] inputs object:`, JSON.stringify(inputs, null, 2));
+
   // Empty state (FR-007a)
   if (inputList.length === 0) {
+    console.log(`[InputPanel] Showing empty state - no inputs detected`);
     return (
       <div className={cn('flex flex-col items-center justify-center p-6 text-center', className)} data-testid="input-panel-empty">
         <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />

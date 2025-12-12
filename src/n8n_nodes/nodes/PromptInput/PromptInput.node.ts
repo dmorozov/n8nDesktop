@@ -200,8 +200,11 @@ export class PromptInput implements INodeType {
         const lineCountValue = countLines(prompt);
 
         // Build output
+        // Include both 'prompt' and 'chatInput' for compatibility with different nodes
+        // AI Agent expects 'chatInput', other nodes may use 'prompt'
         const output: IDataObject = {
           prompt,
+          chatInput: prompt, // For AI Agent compatibility
           length: prompt.length,
           wordCount: wordCountValue,
           lineCount: lineCountValue,
@@ -220,6 +223,7 @@ export class PromptInput implements INodeType {
         if (this.continueOnFail()) {
           const errorOutput: IDataObject = {
             prompt: '',
+            chatInput: '', // For AI Agent compatibility
             length: 0,
             wordCount: 0,
             lineCount: 0,

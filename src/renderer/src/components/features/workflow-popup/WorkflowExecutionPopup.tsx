@@ -53,6 +53,14 @@ export function WorkflowExecutionPopup({
     cleanup,
   } = useWorkflowExecution(open ? workflowId : null);
 
+  // Debug logging
+  console.log(`[WorkflowExecutionPopup] ========== RENDER ==========`);
+  console.log(`[WorkflowExecutionPopup] workflowId: ${workflowId}, open: ${open}`);
+  console.log(`[WorkflowExecutionPopup] isLoading: ${isLoading}`);
+  console.log(`[WorkflowExecutionPopup] inputs keys:`, Object.keys(inputs));
+  console.log(`[WorkflowExecutionPopup] inputs count: ${Object.keys(inputs).length}`);
+  console.log(`[WorkflowExecutionPopup] analysis:`, analysis);
+
   // Focus first input when popup opens (FR-001e)
   useEffect(() => {
     if (open && !isLoading) {

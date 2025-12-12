@@ -84,61 +84,78 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
    * Load workflow analysis and configuration
    */
   const loadWorkflow = useCallback(async (id: string) => {
+    console.log(`[useWorkflowExecution] loadWorkflow called with id: ${id}`);
     setPopupLoading(true);
     setAnalysis(null);
 
     try {
       // Analyze workflow to detect custom nodes
+      console.log(`[useWorkflowExecution] Calling workflowPopup.analyze...`);
       const analysisResult = await window.electron.workflowPopup.analyze(id);
+      console.log(`[useWorkflowExecution] Analysis result:`, JSON.stringify(analysisResult, null, 2));
       setAnalysis(analysisResult);
 
       if (analysisResult.error) {
+        console.error(`[useWorkflowExecution] Analysis returned error: ${analysisResult.error}`);
         failExecution(analysisResult.error);
         return;
       }
 
-      // Load existing config or create new one
-      let existingConfig = await window.electron.workflowPopup.getConfig(id);
+      // Load existing config
+      const existingConfig = await window.electron.workflowPopup.getConfig(id);
+      console.log(`[useWorkflowExecution] Existing config:`, existingConfig);
 
-      if (!existingConfig) {
-        // Create default config from analysis
-        const defaultInputs: Record<string, WorkflowPopupInputFieldConfig> = {};
+      // Always rebuild inputs from analysis to ensure we have all detected nodes
+      // This handles cases where workflow changed or nodes were added/removed
+      const mergedInputs: Record<string, WorkflowPopupInputFieldConfig> = {};
 
-        // Add prompt inputs
-        for (const node of analysisResult.promptInputNodes) {
-          defaultInputs[node.nodeId] = {
-            nodeId: node.nodeId,
-            nodeType: 'promptInput',
-            nodeName: node.nodeName,
-            value: '',
-            required: true,
-          };
-        }
+      console.log(`[useWorkflowExecution] Processing ${analysisResult.promptInputNodes?.length || 0} promptInputNodes`);
+      console.log(`[useWorkflowExecution] Processing ${analysisResult.fileSelectorNodes?.length || 0} fileSelectorNodes`);
 
-        // Add file selectors
-        for (const node of analysisResult.fileSelectorNodes) {
-          defaultInputs[node.nodeId] = {
-            nodeId: node.nodeId,
-            nodeType: 'fileSelector',
-            nodeName: node.nodeName,
-            value: [],
-            required: true,
-          };
-        }
-
-        existingConfig = {
-          workflowId: id,
-          workflowName: analysisResult.workflowName,
-          lastUpdated: new Date().toISOString(),
-          inputs: defaultInputs,
-          lastExecution: null,
+      // Add prompt inputs from analysis
+      for (const node of analysisResult.promptInputNodes || []) {
+        console.log(`[useWorkflowExecution] Adding promptInput node: ${node.nodeId} (${node.nodeName})`);
+        // Preserve existing value if available
+        const existingInput = existingConfig?.inputs?.[node.nodeId];
+        mergedInputs[node.nodeId] = {
+          nodeId: node.nodeId,
+          nodeType: 'promptInput',
+          nodeName: node.nodeName,
+          value: existingInput?.nodeType === 'promptInput' ? existingInput.value : '',
+          required: true,
         };
       }
 
-      setPopupConfig(existingConfig);
+      // Add file selectors from analysis
+      for (const node of analysisResult.fileSelectorNodes || []) {
+        console.log(`[useWorkflowExecution] Adding fileSelector node: ${node.nodeId} (${node.nodeName})`);
+        // Preserve existing value if available
+        const existingInput = existingConfig?.inputs?.[node.nodeId];
+        mergedInputs[node.nodeId] = {
+          nodeId: node.nodeId,
+          nodeType: 'fileSelector',
+          nodeName: node.nodeName,
+          value: existingInput?.nodeType === 'fileSelector' ? existingInput.value : [],
+          required: true,
+        };
+      }
+
+      console.log(`[useWorkflowExecution] Merged inputs:`, JSON.stringify(mergedInputs, null, 2));
+
+      const newConfig: WorkflowPopupConfig = {
+        workflowId: id,
+        workflowName: analysisResult.workflowName,
+        lastUpdated: new Date().toISOString(),
+        inputs: mergedInputs,
+        lastExecution: existingConfig?.lastExecution || null,
+      };
+
+      console.log(`[useWorkflowExecution] Setting popup config with ${Object.keys(mergedInputs).length} inputs`);
+      setPopupConfig(newConfig);
       setCurrentWorkflow(id);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load workflow';
+      console.error(`[useWorkflowExecution] Error loading workflow:`, err);
       failExecution(message);
     } finally {
       setPopupLoading(false);

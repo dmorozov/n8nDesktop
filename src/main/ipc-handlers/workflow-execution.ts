@@ -73,8 +73,15 @@ export function registerWorkflowExecutionHandlers(
    * Analyze workflow to detect input/output nodes
    */
   ipcMain.handle('workflow-popup:analyze', async (_event, workflowId: string) => {
-    console.log(`[IPC] workflow-popup:analyze called for ${workflowId}`);
-    return executor.analyzeWorkflow(workflowId);
+    console.log(`[IPC] workflow-popup:analyze called for workflowId: "${workflowId}"`);
+    try {
+      const result = await executor.analyzeWorkflow(workflowId);
+      console.log(`[IPC] workflow-popup:analyze result:`, JSON.stringify(result, null, 2));
+      return result;
+    } catch (error) {
+      console.error(`[IPC] workflow-popup:analyze error:`, error);
+      throw error;
+    }
   });
 
   // ==================== CONFIG MANAGEMENT ====================
