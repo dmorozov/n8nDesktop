@@ -217,30 +217,42 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
     pollingRef.current = setInterval(async () => {
       try {
         const status = await window.electron.workflowPopup.status(executionId);
+        console.log(`[useWorkflowExecution] Poll status:`, JSON.stringify(status));
 
         // Update progress indicator
         progress = Math.min(progress + 5, 95);
         updateExecutionProgress(status.progress ?? progress);
 
-        if (status.status === 'success' && status.result) {
+        // Check for completion - status.result may not always be present
+        if (status.status === 'success') {
+          console.log(`[useWorkflowExecution] Execution completed successfully`);
           stopPolling();
-          completeExecution(status.result.outputs);
+          completeExecution(status.result?.outputs || []);
 
           // Save config with results
           if (config && workflowId) {
             await window.electron.workflowPopup.saveConfig({
               ...config,
               inputs,
-              lastExecution: status.result,
+              lastExecution: status.result || {
+                executionId,
+                status: 'success',
+                startedAt: new Date().toISOString(),
+                completedAt: new Date().toISOString(),
+                durationMs: 0,
+                outputs: [],
+                error: null,
+              },
               lastUpdated: new Date().toISOString(),
             });
           }
         } else if (status.status === 'error') {
+          console.log(`[useWorkflowExecution] Execution failed:`, status.result?.error);
           stopPolling();
           failExecution(status.result?.error || 'Workflow execution failed');
         }
       } catch (err) {
-        console.error('Polling error:', err);
+        console.error('[useWorkflowExecution] Polling error:', err);
         // Continue polling on transient errors
       }
     }, POLL_INTERVAL);

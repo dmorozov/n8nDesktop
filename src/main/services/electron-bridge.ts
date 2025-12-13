@@ -386,6 +386,8 @@ async function handleSetExecutionConfig(
     // Store with workflowId as key
     executionConfigs.set(body.executionId, body.configs);
     console.log(`[Electron Bridge] Stored execution config for workflow ${body.executionId}`);
+    console.log(`[Electron Bridge] Config keys:`, Object.keys(body.configs));
+    console.log(`[Electron Bridge] Config contents:`, JSON.stringify(body.configs, null, 2));
 
     sendJsonResponse(res, 200, { success: true });
   } catch (error) {
@@ -412,6 +414,9 @@ function handleGetExecutionConfig(
     const executionId = parts[3]; // index 3 after api/electron-bridge/execution-config
     const nodeId = parts[4];
 
+    console.log(`[Electron Bridge] GET execution-config: executionId=${executionId}, nodeId=${nodeId}`);
+    console.log(`[Electron Bridge] Available configs:`, Array.from(executionConfigs.keys()));
+
     if (!executionId) {
       sendJsonResponse(res, 400, {
         success: false,
@@ -421,8 +426,10 @@ function handleGetExecutionConfig(
     }
 
     const configs = executionConfigs.get(executionId);
+    console.log(`[Electron Bridge] Found configs for ${executionId}:`, configs ? 'yes' : 'no');
 
     if (!configs) {
+      console.log(`[Electron Bridge] No configs found for ${executionId}`);
       sendJsonResponse(res, 200, {
         success: true,
         hasExternalConfig: false,
@@ -433,6 +440,9 @@ function handleGetExecutionConfig(
     if (nodeId) {
       // Return specific node config
       const nodeConfig = configs[nodeId];
+      console.log(`[Electron Bridge] Looking for nodeId ${nodeId} in configs:`, Object.keys(configs));
+      console.log(`[Electron Bridge] Node config found:`, nodeConfig ? JSON.stringify(nodeConfig) : 'no');
+
       if (nodeConfig) {
         sendJsonResponse(res, 200, {
           success: true,

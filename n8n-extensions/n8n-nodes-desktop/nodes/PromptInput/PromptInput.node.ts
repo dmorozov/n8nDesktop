@@ -193,11 +193,19 @@ export class PromptInput implements INodeType {
         if (workflowId && nodeId) {
           console.log('[PromptInput] Fetching external config for', workflowId, nodeId);
           const externalConfig = await getExternalNodeConfig(workflowId, nodeId);
-          console.log('[PromptInput] External config result:', externalConfig);
+          console.log('[PromptInput] External config result:', JSON.stringify(externalConfig));
           if (externalConfig?.nodeType === 'promptInput' && typeof externalConfig.value === 'string') {
             // Use prompt from popup instead of node parameter
+            const originalPrompt = prompt;
             prompt = externalConfig.value;
+            console.log('[PromptInput] Using external prompt instead of default');
+            console.log('[PromptInput] Original prompt:', originalPrompt);
+            console.log('[PromptInput] External prompt:', prompt);
+          } else {
+            console.log('[PromptInput] No valid external config, using default prompt:', prompt);
           }
+        } else {
+          console.log('[PromptInput] No workflowId/nodeId, using default prompt:', prompt);
         }
         const options = this.getNodeParameter('options', itemIndex, {}) as {
           minLength?: number;
