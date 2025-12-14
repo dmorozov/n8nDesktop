@@ -120,74 +120,31 @@ export class WorkflowExecutor {
    */
   async analyzeWorkflow(workflowId: string): Promise<WorkflowAnalysisResult> {
     try {
-      console.log(`[WorkflowExecutor] ========== ANALYZE WORKFLOW START ==========`);
-      console.log(`[WorkflowExecutor] Analyzing workflow ID: "${workflowId}"`);
-      console.log(`[WorkflowExecutor] API URL: ${this.baseUrl}/workflows/${workflowId}`);
-
       const authConfig = this.getAuthConfig();
-      console.log(`[WorkflowExecutor] Auth headers present: ${!!authConfig.headers}`);
 
       const response = await axios.get<N8nWorkflow>(
         `${this.baseUrl}/workflows/${workflowId}`,
         authConfig
       );
 
-      console.log(`[WorkflowExecutor] API response status: ${response.status}`);
-      console.log(`[WorkflowExecutor] API response data keys: ${Object.keys(response.data || {}).join(', ')}`);
-
       // n8n API wraps workflow data in a 'data' property
       // Handle both wrapped { data: {...} } and direct workflow response formats
       const responseData = response.data as N8nWorkflow & { data?: N8nWorkflow };
       const workflow: N8nWorkflow = responseData.data ? responseData.data : responseData;
 
-      console.log(`[WorkflowExecutor] Unwrapped workflow keys: ${Object.keys(workflow || {}).join(', ')}`);
-
       const nodes = workflow.nodes || [];
-
-      // Log all node types for debugging
-      console.log(`[WorkflowExecutor] Workflow name: "${workflow.name}"`);
-      console.log(`[WorkflowExecutor] Total nodes count: ${nodes.length}`);
-      console.log(`[WorkflowExecutor] All nodes in workflow:`);
-      nodes.forEach((node, index) => {
-        console.log(`  [${index}] name="${node.name}", id="${node.id || 'none'}", type="${node.type}"`);
-      });
-
-      // Log what we're looking for
-      console.log(`[WorkflowExecutor] Looking for node types:`);
-      console.log(`  - CUSTOM.${NODE_TYPE_SUFFIXES.promptInput}`);
-      console.log(`  - n8n-nodes-desktop.${NODE_TYPE_SUFFIXES.promptInput}`);
-      console.log(`  - CUSTOM.${NODE_TYPE_SUFFIXES.fileSelector}`);
-      console.log(`  - n8n-nodes-desktop.${NODE_TYPE_SUFFIXES.fileSelector}`);
 
       // Detect custom nodes by type (supports both CUSTOM.* and n8n-nodes-desktop.* prefixes)
       const promptInputNodes = nodes
-        .filter((node) => {
-          const isMatch = isCustomNodeType(node.type, NODE_TYPE_SUFFIXES.promptInput);
-          if (isMatch) {
-            console.log(`[WorkflowExecutor] MATCH: "${node.name}" matches promptInput`);
-          }
-          return isMatch;
-        })
+        .filter((node) => isCustomNodeType(node.type, NODE_TYPE_SUFFIXES.promptInput))
         .map((node) => this.mapNodeToInfo(node));
 
       const fileSelectorNodes = nodes
-        .filter((node) => {
-          const isMatch = isCustomNodeType(node.type, NODE_TYPE_SUFFIXES.fileSelector);
-          if (isMatch) {
-            console.log(`[WorkflowExecutor] MATCH: "${node.name}" matches fileSelector`);
-          }
-          return isMatch;
-        })
+        .filter((node) => isCustomNodeType(node.type, NODE_TYPE_SUFFIXES.fileSelector))
         .map((node) => this.mapNodeToInfo(node));
 
       const resultDisplayNodes = nodes
-        .filter((node) => {
-          const isMatch = isCustomNodeType(node.type, NODE_TYPE_SUFFIXES.resultDisplay);
-          if (isMatch) {
-            console.log(`[WorkflowExecutor] MATCH: "${node.name}" matches resultDisplay`);
-          }
-          return isMatch;
-        })
+        .filter((node) => isCustomNodeType(node.type, NODE_TYPE_SUFFIXES.resultDisplay))
         .map((node) => this.mapNodeToInfo(node));
 
       const isSupported =
@@ -195,12 +152,7 @@ export class WorkflowExecutor {
         fileSelectorNodes.length > 0 ||
         resultDisplayNodes.length > 0;
 
-      console.log(`[WorkflowExecutor] ========== ANALYSIS RESULTS ==========`);
-      console.log(`[WorkflowExecutor] promptInputNodes: ${promptInputNodes.length}`);
-      console.log(`[WorkflowExecutor] fileSelectorNodes: ${fileSelectorNodes.length}`);
-      console.log(`[WorkflowExecutor] resultDisplayNodes: ${resultDisplayNodes.length}`);
-      console.log(`[WorkflowExecutor] isSupported: ${isSupported}`);
-      console.log(`[WorkflowExecutor] ========== ANALYZE WORKFLOW END ==========`);
+      console.log(`[WorkflowExecutor] Analyzed workflow "${workflow.name}": ${promptInputNodes.length} promptInputs, ${fileSelectorNodes.length} fileSelectors`);
 
       return {
         workflowId,
@@ -212,15 +164,9 @@ export class WorkflowExecutor {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to analyze workflow';
-      console.error('[WorkflowExecutor] ========== ANALYSIS ERROR ==========');
-      console.error('[WorkflowExecutor] Error:', error);
-      console.error('[WorkflowExecutor] Message:', message);
+      console.error('[WorkflowExecutor] Analysis error:', message);
       if (axios.isAxiosError(error)) {
-        console.error('[WorkflowExecutor] Axios error details:', {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data,
-        });
+        console.error('[WorkflowExecutor] Axios error:', error.response?.status, error.response?.data);
       }
       return {
         workflowId,
@@ -390,7 +336,7 @@ export class WorkflowExecutor {
    * Store execution config in bridge for nodes to fetch
    */
   private async storeExecutionConfig(
-    executionId: string,
+    workflowId: string,
     inputs: Record<string, InputFieldConfig>
   ): Promise<void> {
     try {
@@ -399,20 +345,24 @@ export class WorkflowExecutor {
       // Convert inputs to config format for bridge
       const configs: Record<string, { nodeId: string; nodeType: 'promptInput' | 'fileSelector'; value: string | FileReference[] }> = {};
 
+      console.log(`[WorkflowExecutor] Preparing execution config for workflow ${workflowId}`);
+      console.log(`[WorkflowExecutor] Input node IDs: ${Object.keys(inputs).join(', ')}`);
+
       for (const [nodeId, input] of Object.entries(inputs)) {
         configs[nodeId] = {
           nodeId: input.nodeId,
           nodeType: input.nodeType,
           value: input.value,
         };
+        console.log(`[WorkflowExecutor] Config for node ${nodeId}: type=${input.nodeType}, valueLength=${typeof input.value === 'string' ? input.value.length : 'array'}`);
       }
 
       await axios.post(`${bridgeUrl}/api/electron-bridge/execution-config`, {
-        executionId,
+        executionId: workflowId, // Using workflowId as key (nodes lookup by workflow.id)
         configs,
       });
 
-      console.log(`[WorkflowExecutor] Stored execution config for ${executionId}`);
+      console.log(`[WorkflowExecutor] Stored execution config for workflow ${workflowId} with ${Object.keys(configs).length} node configs`);
     } catch (error) {
       console.error('[WorkflowExecutor] Failed to store execution config:', error);
       throw error;
@@ -483,7 +433,12 @@ export class WorkflowExecutor {
         this.getAuthConfig()
       );
 
-      const execution = response.data;
+      // n8n API wraps execution data in a 'data' property
+      // Handle both wrapped { data: {...} } and direct execution response formats
+      const responseData = response.data as N8nExecution & { data?: N8nExecution };
+      const execution: N8nExecution = responseData.data ? responseData.data : responseData;
+
+      console.log(`[WorkflowExecutor] Execution ${executionId} status check: finished=${execution.finished}, status=${execution.status}`);
 
       // Map n8n status to our status
       let status: 'running' | 'success' | 'error' | 'waiting' = 'running';
@@ -497,6 +452,7 @@ export class WorkflowExecutor {
       let result: ExecutionResult | undefined;
       if (execution.finished) {
         result = await this.extractResults(executionId, execution);
+        console.log(`[WorkflowExecutor] Execution ${executionId} completed with status: ${status}`);
       }
 
       return {

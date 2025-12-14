@@ -256,17 +256,18 @@ export async function getExternalNodeConfig(
   nodeId: string
 ): Promise<IExternalNodeConfig | null> {
   try {
-    const response = await fetch(
-      `${getBridgeUrl()}/api/electron-bridge/execution-config/${executionId}/${nodeId}`,
-      {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000),
-      }
-    );
+    const url = `${getBridgeUrl()}/api/electron-bridge/execution-config/${executionId}/${nodeId}`;
+    console.log(`[BridgeClient] Getting external config from: ${url}`);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(5000),
+    });
 
     if (response.status === 404) {
       // No external config - fall back to internal state
+      console.log(`[BridgeClient] No external config found (404)`);
       return null;
     }
 
@@ -275,8 +276,22 @@ export async function getExternalNodeConfig(
       return null;
     }
 
-    const data = await response.json();
-    return data as IExternalNodeConfig;
+    const data = await response.json() as {
+      success: boolean;
+      hasExternalConfig: boolean;
+      config?: IExternalNodeConfig;
+    };
+
+    console.log(`[BridgeClient] Response:`, JSON.stringify(data));
+
+    // Extract the config from the response wrapper
+    if (data.hasExternalConfig && data.config) {
+      console.log(`[BridgeClient] Found external config for node ${nodeId}:`, JSON.stringify(data.config));
+      return data.config;
+    }
+
+    console.log(`[BridgeClient] No external config in response (hasExternalConfig: ${data.hasExternalConfig})`);
+    return null;
   } catch (error) {
     // Silently fail and fall back to internal state
     console.warn('[BridgeClient] Error getting external config:', error);

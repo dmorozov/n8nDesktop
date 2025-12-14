@@ -84,38 +84,28 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
    * Load workflow analysis and configuration
    */
   const loadWorkflow = useCallback(async (id: string) => {
-    console.log(`[useWorkflowExecution] loadWorkflow called with id: ${id}`);
     setPopupLoading(true);
     setAnalysis(null);
 
     try {
       // Analyze workflow to detect custom nodes
-      console.log(`[useWorkflowExecution] Calling workflowPopup.analyze...`);
       const analysisResult = await window.electron.workflowPopup.analyze(id);
-      console.log(`[useWorkflowExecution] Analysis result:`, JSON.stringify(analysisResult, null, 2));
       setAnalysis(analysisResult);
 
       if (analysisResult.error) {
-        console.error(`[useWorkflowExecution] Analysis returned error: ${analysisResult.error}`);
+        console.error(`[useWorkflowExecution] Analysis error: ${analysisResult.error}`);
         failExecution(analysisResult.error);
         return;
       }
 
       // Load existing config
       const existingConfig = await window.electron.workflowPopup.getConfig(id);
-      console.log(`[useWorkflowExecution] Existing config:`, existingConfig);
 
       // Always rebuild inputs from analysis to ensure we have all detected nodes
-      // This handles cases where workflow changed or nodes were added/removed
       const mergedInputs: Record<string, WorkflowPopupInputFieldConfig> = {};
-
-      console.log(`[useWorkflowExecution] Processing ${analysisResult.promptInputNodes?.length || 0} promptInputNodes`);
-      console.log(`[useWorkflowExecution] Processing ${analysisResult.fileSelectorNodes?.length || 0} fileSelectorNodes`);
 
       // Add prompt inputs from analysis
       for (const node of analysisResult.promptInputNodes || []) {
-        console.log(`[useWorkflowExecution] Adding promptInput node: ${node.nodeId} (${node.nodeName})`);
-        // Preserve existing value if available
         const existingInput = existingConfig?.inputs?.[node.nodeId];
         mergedInputs[node.nodeId] = {
           nodeId: node.nodeId,
@@ -128,8 +118,6 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
 
       // Add file selectors from analysis
       for (const node of analysisResult.fileSelectorNodes || []) {
-        console.log(`[useWorkflowExecution] Adding fileSelector node: ${node.nodeId} (${node.nodeName})`);
-        // Preserve existing value if available
         const existingInput = existingConfig?.inputs?.[node.nodeId];
         mergedInputs[node.nodeId] = {
           nodeId: node.nodeId,
@@ -140,8 +128,6 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
         };
       }
 
-      console.log(`[useWorkflowExecution] Merged inputs:`, JSON.stringify(mergedInputs, null, 2));
-
       const newConfig: WorkflowPopupConfig = {
         workflowId: id,
         workflowName: analysisResult.workflowName,
@@ -150,7 +136,6 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
         lastExecution: existingConfig?.lastExecution || null,
       };
 
-      console.log(`[useWorkflowExecution] Setting popup config with ${Object.keys(mergedInputs).length} inputs`);
       setPopupConfig(newConfig);
       setCurrentWorkflow(id);
     } catch (err) {
@@ -177,6 +162,13 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
 
     // Clear previous results (FR-020)
     clearExecutionResults();
+
+    // Log execution details for debugging
+    console.log(`[useWorkflowExecution] Executing workflow ${workflowId}`);
+    console.log(`[useWorkflowExecution] Input node IDs:`, Object.keys(inputs));
+    for (const [nodeId, input] of Object.entries(inputs)) {
+      console.log(`[useWorkflowExecution] Input ${nodeId}: type=${input.nodeType}, value="${typeof input.value === 'string' ? input.value.substring(0, 100) : 'files'}"`);
+    }
 
     try {
       const response = await window.electron.workflowPopup.execute({
@@ -217,15 +209,14 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
     pollingRef.current = setInterval(async () => {
       try {
         const status = await window.electron.workflowPopup.status(executionId);
-        console.log(`[useWorkflowExecution] Poll status:`, JSON.stringify(status));
 
         // Update progress indicator
         progress = Math.min(progress + 5, 95);
         updateExecutionProgress(status.progress ?? progress);
 
-        // Check for completion - status.result may not always be present
+        // Check for completion
         if (status.status === 'success') {
-          console.log(`[useWorkflowExecution] Execution completed successfully`);
+          console.log(`[useWorkflowExecution] Execution ${executionId} completed successfully`);
           stopPolling();
           completeExecution(status.result?.outputs || []);
 
@@ -247,7 +238,7 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
             });
           }
         } else if (status.status === 'error') {
-          console.log(`[useWorkflowExecution] Execution failed:`, status.result?.error);
+          console.error(`[useWorkflowExecution] Execution ${executionId} failed:`, status.result?.error);
           stopPolling();
           failExecution(status.result?.error || 'Workflow execution failed');
         }

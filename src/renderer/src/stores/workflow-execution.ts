@@ -122,20 +122,12 @@ export function setCurrentWorkflow(workflowId: string | null): void {
  * Set popup configuration
  */
 export function setPopupConfig(config: WorkflowPopupConfig | null): void {
-  console.log(`[workflow-execution store] setPopupConfig called`);
-  console.log(`[workflow-execution store] config:`, config ? JSON.stringify(config, null, 2) : 'null');
-
   $popupConfig.set(config);
   if (config) {
-    console.log(`[workflow-execution store] Setting $inputValues with ${Object.keys(config.inputs).length} inputs`);
-    console.log(`[workflow-execution store] Input keys:`, Object.keys(config.inputs));
     $inputValues.set(config.inputs);
   } else {
-    console.log(`[workflow-execution store] Clearing $inputValues (config is null)`);
     $inputValues.set({});
   }
-
-  console.log(`[workflow-execution store] $inputValues after set:`, $inputValues.get());
 }
 
 /**

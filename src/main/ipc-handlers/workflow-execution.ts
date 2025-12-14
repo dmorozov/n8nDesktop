@@ -124,6 +124,10 @@ export function registerWorkflowExecutionHandlers(
    */
   ipcMain.handle('workflow-popup:execute', async (_event, request: ExecuteWorkflowRequest) => {
     console.log(`[IPC] workflow-popup:execute called for ${request.workflowId}`);
+    console.log(`[IPC] Input node IDs:`, Object.keys(request.inputs));
+    for (const [nodeId, input] of Object.entries(request.inputs)) {
+      console.log(`[IPC] Input ${nodeId}: type=${input.nodeType}, valueLen=${typeof input.value === 'string' ? input.value.length : 'files'}`);
+    }
 
     // Check if already executing this workflow (FR-004a)
     if (ongoingExecutions.has(request.workflowId)) {
@@ -162,7 +166,6 @@ export function registerWorkflowExecutionHandlers(
    * Get execution status
    */
   ipcMain.handle('workflow-popup:status', async (_event, executionId: string) => {
-    console.log(`[IPC] workflow-popup:status called for ${executionId}`);
     return executor.getExecutionStatus(executionId);
   });
 
