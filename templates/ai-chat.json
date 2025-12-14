@@ -39,22 +39,20 @@
       },
       {
         "parameters": {
-          "assignments": {
-            "assignments": [
-              {
-                "id": "output-result",
-                "name": "response",
-                "value": "={{ $json.output }}",
-                "type": "string"
-              }
-            ]
-          },
-          "options": {}
+          "outputType": "text",
+          "contentSource": "auto",
+          "fallbackText": "No response received",
+          "textOptions": {
+            "renderMarkdown": true,
+            "sanitizeHtml": true
+          }
         },
-        "name": "Show Result",
-        "type": "n8n-nodes-base.set",
-        "typeVersion": 3.4,
-        "position": [900, 256]
+        "name": "Result Display",
+        "type": "CUSTOM.resultDisplay",
+        "typeVersion": 1,
+        "position": [900, 256],
+        "notesInFlow": true,
+        "notes": "Displays AI response in the popup"
       }
     ],
     "pinData": {},
@@ -85,7 +83,7 @@
         "main": [
           [
             {
-              "node": "Show Result",
+              "node": "Result Display",
               "type": "main",
               "index": 0
             }

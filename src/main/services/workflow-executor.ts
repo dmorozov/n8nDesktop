@@ -479,6 +479,8 @@ export class WorkflowExecutor {
     const outputs: OutputResult[] = [];
     let error: string | null = null;
 
+    console.log(`[WorkflowExecutor] Extracting results for execution ${executionId}`);
+
     // Check for execution error
     if (execution.data?.resultData?.error) {
       error = execution.data.resultData.error.message;
@@ -487,11 +489,13 @@ export class WorkflowExecutor {
     // Extract outputs from ResultDisplay nodes
     const runData = execution.data?.resultData?.runData;
     if (runData) {
+      console.log(`[WorkflowExecutor] Checking runData for nodes: ${Object.keys(runData).join(', ')}`);
       for (const [nodeName, nodeRuns] of Object.entries(runData)) {
         for (const run of nodeRuns) {
           // Check if this is a ResultDisplay node output
           const outputData = run.data?.main?.[0]?.[0]?.json;
           if (outputData && this.isResultDisplayOutput(outputData)) {
+            console.log(`[WorkflowExecutor] Found ResultDisplay output in ${nodeName}:`, JSON.stringify(outputData).substring(0, 200));
             outputs.push({
               nodeId: nodeName,
               nodeName: nodeName,
@@ -504,15 +508,21 @@ export class WorkflowExecutor {
       }
     }
 
+    console.log(`[WorkflowExecutor] Found ${outputs.length} outputs from runData`);
+
     // Also try to get results from bridge (if ResultDisplay emitted them)
     try {
       const bridgeResults = await this.getResultsFromBridge(executionId);
+      console.log(`[WorkflowExecutor] Found ${bridgeResults.length} outputs from bridge`);
       if (bridgeResults.length > 0) {
         outputs.push(...bridgeResults);
       }
-    } catch {
+    } catch (e) {
+      console.error('[WorkflowExecutor] Error getting bridge results:', e);
       // Bridge results are optional
     }
+
+    console.log(`[WorkflowExecutor] Total outputs: ${outputs.length}`);
 
     return {
       executionId,
@@ -535,15 +545,19 @@ export class WorkflowExecutor {
   private async getResultsFromBridge(executionId: string): Promise<OutputResult[]> {
     try {
       const bridgeUrl = getElectronBridgeUrl();
-      const response = await axios.get(
-        `${bridgeUrl}/api/electron-bridge/execution-results/${executionId}`
-      );
+      const url = `${bridgeUrl}/api/electron-bridge/execution-results/${executionId}`;
+      console.log(`[WorkflowExecutor] Fetching results from bridge: ${url}`);
+
+      const response = await axios.get(url);
+
+      console.log(`[WorkflowExecutor] Bridge response:`, JSON.stringify(response.data));
 
       if (response.data.success && response.data.results) {
         return response.data.results;
       }
       return [];
-    } catch {
+    } catch (e) {
+      console.error(`[WorkflowExecutor] Error fetching from bridge:`, e);
       return [];
     }
   }

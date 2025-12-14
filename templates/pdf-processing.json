@@ -177,6 +177,24 @@
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
         "position": [2040, 200]
+      },
+      {
+        "parameters": {
+          "outputType": "text",
+          "contentSource": "custom",
+          "propertyPath": "json.summary_markdown",
+          "fallbackText": "No summary generated",
+          "textOptions": {
+            "renderMarkdown": true,
+            "sanitizeHtml": true
+          }
+        },
+        "name": "Result Display",
+        "type": "CUSTOM.resultDisplay",
+        "typeVersion": 1,
+        "position": [2240, 200],
+        "notesInFlow": true,
+        "notes": "Displays the document summary in the popup"
       }
     ],
     "connections": {
@@ -302,6 +320,17 @@
           [
             {
               "node": "Format Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Output": {
+        "main": [
+          [
+            {
+              "node": "Result Display",
               "type": "main",
               "index": 0
             }

@@ -8,11 +8,13 @@
  * FR-011, FR-012, FR-013, FR-014
  */
 
-import { useCallback, useMemo } from 'react';
-import { Download, FileText, AlertCircle, Play } from 'lucide-react';
+import { useCallback } from 'react';
+import { Download, FileText, AlertCircle, Play, File, FileType, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { WorkflowPopupOutputResult } from '../../../../../preload/types';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface OutputPanelProps {
   results: WorkflowPopupOutputResult[];
@@ -123,48 +125,46 @@ interface OutputResultItemProps {
   testId?: string;
 }
 
+/**
+ * Get icon for file type based on mime type
+ */
+function getFileIcon(mimeType: string) {
+  if (mimeType.startsWith('image/')) {
+    return Image;
+  }
+  if (mimeType === 'application/pdf') {
+    return FileType;
+  }
+  return File;
+}
+
+/**
+ * Format file size for display
+ */
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function OutputResultItem({ result, onDownload, testId }: OutputResultItemProps) {
-  // Simple markdown to HTML conversion (FR-011)
-  // Note: For production, use a proper markdown library with XSS sanitization (FR-011a)
-  const renderedContent = useMemo(() => {
-    if (result.contentType === 'file') {
-      return null;
-    }
-
-    // Basic markdown conversion (safe subset)
-    let html = result.content
-      // Escape HTML first to prevent XSS (FR-011a)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      // Then apply markdown
-      .replace(/^### (.+)$/gm, '<h3 class="text-lg font-semibold mt-4 mb-2">$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2 class="text-xl font-semibold mt-4 mb-2">$1</h2>')
-      .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold mt-4 mb-2">$1</h1>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/`(.+?)`/g, '<code class="bg-muted px-1 py-0.5 rounded text-sm">$1</code>')
-      .replace(/^- (.+)$/gm, '<li class="ml-4">$1</li>')
-      .replace(/^(\d+)\. (.+)$/gm, '<li class="ml-4">$2</li>')
-      .replace(/\n\n/g, '</p><p class="my-2">')
-      .replace(/\n/g, '<br />');
-
-    // Wrap in paragraph if not already wrapped
-    if (!html.startsWith('<h') && !html.startsWith('<li')) {
-      html = `<p class="my-2">${html}</p>`;
-    }
-
-    return html;
-  }, [result.content, result.contentType]);
-
+  // File output
   if (result.contentType === 'file' && result.fileReference) {
+    const FileIcon = getFileIcon(result.fileReference.mimeType);
+
     return (
-      <div className="flex items-center justify-between gap-2 p-3 rounded-md border bg-card" data-testid={testId}>
-        <div className="flex items-center gap-2 min-w-0">
-          <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-          <div className="min-w-0">
-            <p className="text-sm font-medium truncate">{result.fileReference.name}</p>
-            <p className="text-xs text-muted-foreground">{result.nodeName}</p>
+      <div className="flex items-center justify-between gap-3 p-3 rounded-md border bg-card" data-testid={testId}>
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="flex items-center justify-center w-10 h-10 rounded-md bg-muted">
+            <FileIcon className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium truncate" title={result.fileReference.name}>
+              {result.fileReference.name}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {formatFileSize(result.fileReference.size)} • {result.nodeName}
+            </p>
           </div>
         </div>
         <Button
@@ -172,6 +172,7 @@ function OutputResultItem({ result, onDownload, testId }: OutputResultItemProps)
           variant="outline"
           size="sm"
           onClick={() => onDownload(result)}
+          className="flex-shrink-0"
         >
           <Download className="mr-2 h-4 w-4" />
           Download
@@ -180,17 +181,18 @@ function OutputResultItem({ result, onDownload, testId }: OutputResultItemProps)
     );
   }
 
+  // Text/Markdown output - use react-markdown for proper rendering
   return (
     <div className="flex flex-col gap-2 p-3 rounded-md border bg-card" data-testid={testId}>
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <FileText className="h-3 w-3" />
         {result.nodeName}
       </div>
-      <div
-        className="prose prose-sm dark:prose-invert max-w-none"
-        // Safe because we escaped HTML first
-        dangerouslySetInnerHTML={{ __html: renderedContent || '' }}
-      />
+      <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:mt-4 prose-headings:mb-2 prose-p:my-2 prose-pre:bg-muted prose-pre:p-3 prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:before:content-none prose-code:after:content-none">
+        <Markdown remarkPlugins={[remarkGfm]}>
+          {result.content}
+        </Markdown>
+      </div>
     </div>
   );
 }

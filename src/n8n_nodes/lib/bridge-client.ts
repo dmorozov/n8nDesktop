@@ -324,21 +324,23 @@ export interface IExecutionResult {
  */
 export async function postExecutionResult(result: IExecutionResult): Promise<boolean> {
   try {
-    const response = await fetch(
-      `${getBridgeUrl()}/api/electron-bridge/execution-result`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(result),
-        signal: AbortSignal.timeout(5000),
-      }
-    );
+    const url = `${getBridgeUrl()}/api/electron-bridge/execution-result`;
+    console.log(`[BridgeClient] Posting execution result to: ${url}`);
+    console.log(`[BridgeClient] Result: executionId=${result.executionId}, nodeId=${result.nodeId}, contentType=${result.contentType}, contentLength=${result.content.length}`);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(result),
+      signal: AbortSignal.timeout(5000),
+    });
 
     if (!response.ok) {
       console.warn(`[BridgeClient] Failed to post execution result: ${response.status}`);
       return false;
     }
 
+    console.log(`[BridgeClient] Successfully posted execution result`);
     return true;
   } catch (error) {
     // Silently fail - the popup may not be open

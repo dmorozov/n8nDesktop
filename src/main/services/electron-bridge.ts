@@ -521,29 +521,38 @@ async function handleStoreExecutionResult(
     const body = (await parseRequestBody(req)) as {
       executionId: string;
       nodeId: string;
-      result: {
-        nodeId: string;
-        nodeName: string;
-        contentType: 'markdown' | 'text' | 'file';
-        content: string;
-        fileReference: { path: string; name: string; size: number; mimeType: string } | null;
-      };
+      nodeName: string;
+      contentType: 'markdown' | 'text' | 'file';
+      content: string;
+      fileReference?: { path: string; name: string; size: number; mimeType: string };
     };
 
-    if (!body.executionId || !body.result) {
+    console.log(`[Electron Bridge] POST execution-result received:`, JSON.stringify(body));
+
+    if (!body.executionId || !body.nodeId) {
+      console.error(`[Electron Bridge] Missing executionId or nodeId`);
       sendJsonResponse(res, 400, {
         success: false,
-        error: 'Missing executionId or result',
+        error: 'Missing executionId or nodeId',
       });
       return;
     }
 
+    // Build the result object from the body
+    const result = {
+      nodeId: body.nodeId,
+      nodeName: body.nodeName,
+      contentType: body.contentType,
+      content: body.content,
+      fileReference: body.fileReference || null,
+    };
+
     // Get or create results array for this execution
     const results = executionResults.get(body.executionId) || [];
-    results.push(body.result);
+    results.push(result);
     executionResults.set(body.executionId, results);
 
-    console.log(`[Electron Bridge] Stored execution result for ${body.executionId}/${body.nodeId}`);
+    console.log(`[Electron Bridge] Stored execution result for ${body.executionId}/${body.nodeId}, total results: ${results.length}`);
 
     sendJsonResponse(res, 200, { success: true });
   } catch (error) {
@@ -569,6 +578,8 @@ function handleGetExecutionResults(
     const parts = pathname.split('/').filter(Boolean);
     const executionId = parts[3];
 
+    console.log(`[Electron Bridge] GET execution-results for ${executionId}`);
+
     if (!executionId) {
       sendJsonResponse(res, 400, {
         success: false,
@@ -578,6 +589,7 @@ function handleGetExecutionResults(
     }
 
     const results = executionResults.get(executionId) || [];
+    console.log(`[Electron Bridge] Found ${results.length} results for execution ${executionId}`);
 
     sendJsonResponse(res, 200, {
       success: true,
