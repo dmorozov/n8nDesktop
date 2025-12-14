@@ -131,14 +131,14 @@
       {
         "parameters": {
           "chunkingMode": "simple",
-          "chunkSize": 16384,
-          "chunkOverlap": 200,
+          "chunkSize": 4000,
+          "chunkOverlap": 400,
           "options": {
             "summarizationMethodAndPrompts": {
               "values": {
-                "summarizationMethod": "map_reduce",
+                "summarizationMethod": "refine",
                 "prompt": "Write a concise summary of the following text:\n\n{text}\n\nCONCISE SUMMARY:",
-                "combineMapPrompt": "You are given a set of summaries from a document. Combine them into a final, coherent summary that includes:\n\n1. A brief overview (2-3 sentences)\n2. Key points (bullet list)\n3. Main topics covered\n\nSummaries:\n{text}\n\nFINAL SUMMARY:"
+                "refinePrompt": "Your job is to produce a final summary.\nWe have provided an existing summary up to a certain point:\n\n{existing_answer}\n\nWe have the opportunity to refine the existing summary (only if needed) with some more context below.\n------------\n{text}\n------------\n\nGiven the new context, refine the original summary. If the context isn't useful, return the original summary.\n\nInclude:\n1. A brief overview (2-3 sentences)\n2. Key points (bullet list)\n3. Main topics covered\n\nREFINED SUMMARY:"
               }
             }
           }
@@ -151,7 +151,9 @@
       {
         "parameters": {
           "model": "gpt-4o-mini",
-          "options": {}
+          "options": {
+            "timeout": 120000
+          }
         },
         "name": "OpenAI Chat Model",
         "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
@@ -171,7 +173,7 @@
       },
       {
         "parameters": {
-          "jsCode": "// Format the final output with both HTML and original markdown\nconst html = $input.first().json.data;\nconst summaryResponse = $('Summarization Chain').first().json.response;\nconst processResult = $('Process Result').first().json;\n\nreturn [{\n  json: {\n    summary_html: html,\n    summary_markdown: summaryResponse.text,\n    original_document: processResult.markdown,\n    metadata: processResult.metadata\n  }\n}];"
+          "jsCode": "// Format the final output with both HTML and original markdown\nconst html = $input.first().json.data || '';\nconst summaryChainOutput = $('Summarization Chain').first().json;\nconst processResult = $('Process Result').first().json;\n\n// Handle case where summarization may have failed or been refused\nlet summaryText = '';\nif (summaryChainOutput.response && summaryChainOutput.response.text) {\n  summaryText = summaryChainOutput.response.text;\n} else if (summaryChainOutput.text) {\n  summaryText = summaryChainOutput.text;\n} else if (typeof summaryChainOutput === 'string') {\n  summaryText = summaryChainOutput;\n}\n\n// Check if the summary contains a refusal message\nconst isRefusal = summaryText.toLowerCase().includes(\"can't assist\") || \n                  summaryText.toLowerCase().includes(\"cannot assist\") ||\n                  summaryText.toLowerCase().includes(\"i'm not able\");\n\nif (isRefusal || !summaryText) {\n  // If summarization failed, return the original document excerpt\n  const excerpt = (processResult.markdown || '').substring(0, 2000);\n  return [{\n    json: {\n      output: '## Summary Not Available\\n\\nThe AI was unable to generate a summary for this document.\\n\\n### Document Preview\\n\\n' + excerpt + (processResult.markdown?.length > 2000 ? '\\n\\n*[Document truncated...]*' : ''),\n      summary_markdown: null,\n      original_document: processResult.markdown,\n      metadata: processResult.metadata,\n      error: 'Summarization failed or was refused by the AI model'\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    output: summaryText,\n    summary_html: html,\n    summary_markdown: summaryText,\n    original_document: processResult.markdown,\n    metadata: processResult.metadata\n  }\n}];"
         },
         "name": "Format Output",
         "type": "n8n-nodes-base.code",
@@ -181,9 +183,8 @@
       {
         "parameters": {
           "outputType": "text",
-          "contentSource": "custom",
-          "propertyPath": "json.summary_markdown",
-          "fallbackText": "No summary generated",
+          "contentSource": "auto",
+          "fallbackText": "No summary generated. The AI model may have refused to process this document.",
           "textOptions": {
             "renderMarkdown": true,
             "sanitizeHtml": true
