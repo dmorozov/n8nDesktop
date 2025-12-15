@@ -147,10 +147,10 @@ export function WorkflowExecutionPopup({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
         className={cn(
-          // Responsive sizing (FR-001a)
-          'w-[80vw] h-[80vh]',
+          // Responsive sizing (FR-001a) - 96% width for more output space
+          'w-[96vw] h-[90vh]',
           'min-w-[600px] min-h-[400px]',
-          'max-w-[1400px] max-h-[900px]',
+          'max-w-[1800px] max-h-[1000px]',
           'flex flex-col p-0 gap-0'
         )}
         onKeyDown={handleKeyDown}
@@ -204,13 +204,13 @@ export function WorkflowExecutionPopup({
             </div>
           ) : (
             <>
-              {/* Input Panel - Left ~40% */}
+              {/* Input Panel - Left ~25% (smaller for more output space) */}
               <InputPanel
                 inputs={inputs}
                 disabled={isExecuting}
                 onInputChange={updateInput}
                 onSelectFiles={selectFiles}
-                className="w-[40%] min-w-[200px]"
+                className="w-[25%] min-w-[250px] max-w-[400px]"
               />
 
               {/* Center Indicator - Fixed 100px (FR-015, FR-016) */}
@@ -219,12 +219,12 @@ export function WorkflowExecutionPopup({
                 progress={executionProgress}
               />
 
-              {/* Output Panel - Right flex */}
+              {/* Output Panel - Right flex (takes remaining space) */}
               <OutputPanel
                 results={results}
                 error={error}
                 status={status}
-                className="flex-1 min-w-[200px]"
+                className="flex-1 min-w-[300px]"
               />
             </>
           )}
