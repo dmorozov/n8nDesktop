@@ -130,15 +130,13 @@
       },
       {
         "parameters": {
-          "chunkingMode": "simple",
-          "chunkSize": 4000,
-          "chunkOverlap": 400,
+          "operationMode": "documentLoader",
           "options": {
             "summarizationMethodAndPrompts": {
               "values": {
-                "summarizationMethod": "refine",
-                "prompt": "Write a concise summary of the following text:\n\n{text}\n\nCONCISE SUMMARY:",
-                "refinePrompt": "Your job is to produce a final summary.\nWe have provided an existing summary up to a certain point:\n\n{existing_answer}\n\nWe have the opportunity to refine the existing summary (only if needed) with some more context below.\n------------\n{text}\n------------\n\nGiven the new context, refine the original summary. If the context isn't useful, return the original summary.\n\nInclude:\n1. A brief overview (2-3 sentences)\n2. Key points (bullet list)\n3. Main topics covered\n\nREFINED SUMMARY:"
+                "summarizationMethod": "map_reduce",
+                "combineMapPrompt": "Write a concise summary of the following text:\n\n\"{text}\"\n\nCONCISE SUMMARY:",
+                "prompt": "Write a comprehensive summary from these partial summaries:\n\n\"{text}\"\n\nThe summary should include:\n1. A brief overview (2-3 sentences)\n2. Key points (bullet list)\n3. Main topics covered\n\nFINAL SUMMARY:"
               }
             }
           }
@@ -158,7 +156,29 @@
         "name": "OpenAI Chat Model",
         "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
         "typeVersion": 1,
+        "position": [1540, 400]
+      },
+      {
+        "parameters": {
+          "jsonMode": "expressionData",
+          "jsonData": "={{ $json.markdown }}",
+          "options": {}
+        },
+        "name": "Default Data Loader",
+        "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+        "typeVersion": 1,
         "position": [1640, 400]
+      },
+      {
+        "parameters": {
+          "chunkSize": 4000,
+          "chunkOverlap": 400,
+          "options": {}
+        },
+        "name": "Recursive Character Text Splitter",
+        "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+        "typeVersion": 1,
+        "position": [1740, 520]
       },
       {
         "parameters": {
@@ -300,6 +320,28 @@
             {
               "node": "Summarization Chain",
               "type": "ai_languageModel",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Default Data Loader": {
+        "ai_document": [
+          [
+            {
+              "node": "Summarization Chain",
+              "type": "ai_document",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Recursive Character Text Splitter": {
+        "ai_textSplitter": [
+          [
+            {
+              "node": "Default Data Loader",
+              "type": "ai_textSplitter",
               "index": 0
             }
           ]
