@@ -196,3 +196,6 @@ Added getTemplatePlaceholderValues() function that returns:
 - Added replacePlaceholders() function to substit
 
 sudo netstat -tulpn | grep :5678
+
+https://n8n.io/workflows/?q=summarize+big+pdf+document
+
