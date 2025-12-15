@@ -441,16 +441,20 @@ export class WorkflowExecutor {
       console.log(`[WorkflowExecutor] Execution ${executionId} status check: finished=${execution.finished}, status=${execution.status}`);
 
       // Map n8n status to our status
+      // n8n status can be: 'running', 'success', 'error', 'waiting', 'canceled', 'crashed'
       let status: 'running' | 'success' | 'error' | 'waiting' = 'running';
       if (execution.finished) {
         status = execution.status === 'success' ? 'success' : 'error';
       } else if (execution.status === 'waiting') {
         status = 'waiting';
+      } else if (execution.status === 'error' || execution.status === 'canceled') {
+        // Handle cases where execution failed but finished flag might not be set
+        status = 'error';
       }
 
-      // Build result if finished
+      // Build result if finished or errored
       let result: ExecutionResult | undefined;
-      if (execution.finished) {
+      if (execution.finished || status === 'error') {
         result = await this.extractResults(executionId, execution);
         console.log(`[WorkflowExecutor] Execution ${executionId} completed with status: ${status}`);
       }
@@ -462,9 +466,42 @@ export class WorkflowExecutor {
       };
     } catch (error) {
       console.error('[WorkflowExecutor] Status check error:', error);
+
+      // If we get an axios error, check if it's a 404 (execution not found)
+      // which could mean the execution completed and was cleaned up
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 404) {
+          console.error(`[WorkflowExecutor] Execution ${executionId} not found - may have been cleaned up`);
+          return {
+            executionId,
+            status: 'error',
+            result: {
+              executionId,
+              status: 'error',
+              startedAt: new Date().toISOString(),
+              completedAt: new Date().toISOString(),
+              durationMs: 0,
+              outputs: [],
+              error: 'Execution not found - it may have completed or been cleaned up',
+            },
+          };
+        }
+      }
+
+      // For other errors, return error status to prevent infinite polling
+      // This is safer than returning 'running' which could cause the UI to hang
       return {
         executionId,
-        status: 'running',
+        status: 'error',
+        result: {
+          executionId,
+          status: 'error',
+          startedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          durationMs: 0,
+          outputs: [],
+          error: error instanceof Error ? error.message : 'Failed to check execution status',
+        },
       };
     }
   }
@@ -478,20 +515,29 @@ export class WorkflowExecutor {
   ): Promise<ExecutionResult> {
     const outputs: OutputResult[] = [];
     let error: string | null = null;
+    const nodeErrors: string[] = [];
 
     console.log(`[WorkflowExecutor] Extracting results for execution ${executionId}`);
 
-    // Check for execution error
+    // Check for execution-level error
     if (execution.data?.resultData?.error) {
       error = execution.data.resultData.error.message;
+      console.log(`[WorkflowExecutor] Found execution-level error: ${error}`);
     }
 
-    // Extract outputs from ResultDisplay nodes
+    // Extract outputs from ResultDisplay nodes AND check for node-level errors
     const runData = execution.data?.resultData?.runData;
     if (runData) {
       console.log(`[WorkflowExecutor] Checking runData for nodes: ${Object.keys(runData).join(', ')}`);
       for (const [nodeName, nodeRuns] of Object.entries(runData)) {
         for (const run of nodeRuns) {
+          // Check for node-level errors (this catches failures in nodes like Summarization Chain)
+          if (run.error) {
+            const nodeError = `${nodeName}: ${run.error.message}`;
+            console.log(`[WorkflowExecutor] Found node-level error in ${nodeName}: ${run.error.message}`);
+            nodeErrors.push(nodeError);
+          }
+
           // Check if this is a ResultDisplay node output
           const outputData = run.data?.main?.[0]?.[0]?.json;
           if (outputData && this.isResultDisplayOutput(outputData)) {
@@ -506,6 +552,18 @@ export class WorkflowExecutor {
           }
         }
       }
+    }
+
+    // Combine execution error with node errors
+    if (nodeErrors.length > 0 && !error) {
+      error = nodeErrors.join('; ');
+    } else if (nodeErrors.length > 0 && error) {
+      error = `${error}; Node errors: ${nodeErrors.join('; ')}`;
+    }
+
+    // Also check the execution status field for error indication
+    if (!error && execution.status === 'error') {
+      error = 'Workflow execution failed';
     }
 
     console.log(`[WorkflowExecutor] Found ${outputs.length} outputs from runData`);

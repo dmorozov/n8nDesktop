@@ -205,10 +205,15 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
    */
   const startPolling = useCallback((executionId: string) => {
     let progress = 0;
+    let consecutiveErrors = 0;
+    const MAX_CONSECUTIVE_ERRORS = 5;
 
     pollingRef.current = setInterval(async () => {
       try {
         const status = await window.electron.workflowPopup.status(executionId);
+
+        // Reset error counter on successful poll
+        consecutiveErrors = 0;
 
         // Update progress indicator
         progress = Math.min(progress + 5, 95);
@@ -243,8 +248,15 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
           failExecution(status.result?.error || 'Workflow execution failed');
         }
       } catch (err) {
-        console.error('[useWorkflowExecution] Polling error:', err);
-        // Continue polling on transient errors
+        consecutiveErrors++;
+        console.error(`[useWorkflowExecution] Polling error (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`, err);
+
+        // Stop polling after too many consecutive errors to prevent infinite loop
+        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          console.error('[useWorkflowExecution] Too many consecutive polling errors, stopping');
+          stopPolling();
+          failExecution('Lost connection to execution status - please check n8n logs');
+        }
       }
     }, POLL_INTERVAL);
   }, [config, inputs, workflowId]);
