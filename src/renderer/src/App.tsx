@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/react';
 import { initN8nStatusSubscription } from './stores/n8n';
 import { $settings, loadSettings } from './stores/settings';
 import { $editorVisible, initEditorVisibilitySubscription, closeEditor } from './stores/editor';
+import { updateExecution, removeExecution } from './stores/workflows';
 import { ThemeProvider } from './components/theme-provider';
 import { MainLayout } from './components/layout/MainLayout';
 import { MinimizedSidebar } from './components/layout/MinimizedSidebar';
@@ -70,6 +71,21 @@ export function App() {
     // Subscribe to editor visibility changes
     const unsubscribeEditor = initEditorVisibilitySubscription();
 
+    // Subscribe to workflow execution completed events (from background polling)
+    const unsubscribeExecutionCompleted = window.electron.workflowPopup.onExecutionCompleted((data) => {
+      console.log('[App] Received workflow-execution:completed event:', data);
+      // Update the running executions store to reflect the completed status
+      if (data.status === 'success') {
+        updateExecution(data.executionId, { status: 'success', finishedAt: new Date().toISOString() });
+      } else {
+        updateExecution(data.executionId, { status: 'error', finishedAt: new Date().toISOString() });
+      }
+      // Remove the execution from running list after a short delay to allow UI update
+      setTimeout(() => {
+        removeExecution(data.executionId);
+      }, 100);
+    });
+
     // Load settings
     loadSettings().then(() => {
       setIsLoading(false);
@@ -78,6 +94,7 @@ export function App() {
     return () => {
       unsubscribeN8n();
       unsubscribeEditor();
+      unsubscribeExecutionCompleted();
     };
   }, []);
 

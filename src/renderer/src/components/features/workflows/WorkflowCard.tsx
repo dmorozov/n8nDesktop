@@ -143,9 +143,15 @@ export function WorkflowCard({
 
         {/* Status and Info Row */}
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <Badge variant={workflow.active ? 'success' : 'secondary'}>
-            {workflow.active ? 'Active' : 'Inactive'}
-          </Badge>
+          {isRunning ? (
+            <Badge variant="default" className="bg-blue-500 hover:bg-blue-500 animate-pulse">
+              Executing
+            </Badge>
+          ) : (
+            <Badge variant={workflow.active ? 'success' : 'secondary'}>
+              {workflow.active ? 'Active' : 'Inactive'}
+            </Badge>
+          )}
           <span className="text-xs text-muted-foreground">
             {nodeCount} node{nodeCount !== 1 ? 's' : ''}
           </span>

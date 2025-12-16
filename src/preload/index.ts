@@ -151,6 +151,12 @@ const electronAPI: ElectronAPI = {
     saveFile: (options: WorkflowPopupFileSaveOptions) => ipcRenderer.invoke('workflow-popup:save-file', options),
     copyOutputFile: (sourcePath: string, destinationPath: string) =>
       ipcRenderer.invoke('workflow-popup:copy-output-file', sourcePath, destinationPath),
+    getOngoingExecution: (workflowId: string) => ipcRenderer.invoke('workflow-popup:get-ongoing-execution', workflowId),
+    onExecutionCompleted: (callback: (data: { workflowId: string; executionId: string; status: string }) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, data: { workflowId: string; executionId: string; status: string }) => callback(data);
+      ipcRenderer.on('workflow-execution:completed', listener);
+      return () => ipcRenderer.removeListener('workflow-execution:completed', listener);
+    },
   },
 
   // Docling OCR service

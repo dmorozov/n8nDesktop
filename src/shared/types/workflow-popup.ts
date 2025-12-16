@@ -77,6 +77,8 @@ export interface WorkflowPopupConfig {
   lastUpdated: string; // ISO8601
   inputs: Record<string, InputFieldConfig>;
   lastExecution: ExecutionResult | null;
+  /** ID of the last triggered execution (for resuming status polling) */
+  lastExecutionId: string | null;
 }
 
 // ============================================================================

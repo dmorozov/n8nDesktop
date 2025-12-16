@@ -21,14 +21,19 @@ import {
   setCurrentWorkflow,
   setPopupConfig,
   updateInputValue,
-  startExecution,
+  startExecution as startPopupExecution,
   updateExecutionProgress,
-  completeExecution,
-  failExecution,
+  completeExecution as completePopupExecution,
+  failExecution as failPopupExecution,
   resetExecutionState,
   setPopupLoading,
   clearExecutionResults,
 } from '@/stores/workflow-execution';
+import {
+  startExecution as startWorkflowExecution,
+  updateExecution as updateWorkflowExecution,
+  removeExecution,
+} from '@/stores/workflows';
 import type {
   WorkflowPopupAnalysisResult,
   WorkflowPopupConfig,
@@ -81,6 +86,140 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   /**
+   * Stop polling
+   */
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Start polling for execution status
+   */
+  const startPolling = useCallback((executionId: string) => {
+    let progress = 0;
+    let consecutiveErrors = 0;
+    const MAX_CONSECUTIVE_ERRORS = 5;
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const status = await window.electron.workflowPopup.status(executionId);
+
+        // Reset error counter on successful poll
+        consecutiveErrors = 0;
+
+        // Update progress indicator
+        progress = Math.min(progress + 5, 95);
+        updateExecutionProgress(status.progress ?? progress);
+
+        // Check for completion
+        if (status.status === 'success') {
+          console.log(`[useWorkflowExecution] Execution ${executionId} completed successfully`);
+          stopPolling();
+          completePopupExecution(status.result?.outputs || []);
+          // Update workflows store
+          updateWorkflowExecution(executionId, { status: 'success', finishedAt: new Date().toISOString() });
+
+          // Save config with results
+          if (config && workflowId) {
+            await window.electron.workflowPopup.saveConfig({
+              ...config,
+              inputs,
+              lastExecution: status.result || {
+                executionId,
+                status: 'success',
+                startedAt: new Date().toISOString(),
+                completedAt: new Date().toISOString(),
+                durationMs: 0,
+                outputs: [],
+                error: null,
+              },
+              lastUpdated: new Date().toISOString(),
+            });
+          }
+        } else if (status.status === 'error') {
+          console.error(`[useWorkflowExecution] Execution ${executionId} failed:`, status.result?.error);
+          stopPolling();
+          failPopupExecution(status.result?.error || 'Workflow execution failed');
+          // Update workflows store
+          updateWorkflowExecution(executionId, { status: 'error', finishedAt: new Date().toISOString() });
+        }
+      } catch (err) {
+        consecutiveErrors++;
+        console.error(`[useWorkflowExecution] Polling error (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`, err);
+
+        // Stop polling after too many consecutive errors to prevent infinite loop
+        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          console.error('[useWorkflowExecution] Too many consecutive polling errors, stopping');
+          stopPolling();
+          failPopupExecution('Lost connection to execution status - please check n8n logs');
+          // Update workflows store
+          updateWorkflowExecution(executionId, { status: 'error', finishedAt: new Date().toISOString() });
+        }
+      }
+    }, POLL_INTERVAL);
+  }, [config, inputs, workflowId, stopPolling]);
+
+  // Use ref to store startPolling to avoid dependency chain issues
+  const startPollingRef = useRef(startPolling);
+  startPollingRef.current = startPolling;
+
+  /**
+   * Check for ongoing or completed execution and resume/display results
+   */
+  const checkAndResumeExecution = useCallback(async (wfId: string) => {
+    try {
+      console.log(`[useWorkflowExecution:checkAndResume] Checking for workflow ${wfId}`);
+      const ongoingStatus = await window.electron.workflowPopup.getOngoingExecution(wfId);
+
+      console.log(`[useWorkflowExecution:checkAndResume] Response:`, {
+        isRunning: ongoingStatus.isRunning,
+        executionId: ongoingStatus.executionId,
+        hasResult: !!ongoingStatus.result,
+        resultStatus: ongoingStatus.result?.status,
+        resultError: ongoingStatus.result?.error,
+      });
+
+      if (ongoingStatus.isRunning && ongoingStatus.executionId) {
+        // Execution is still running - resume polling
+        console.log(`[useWorkflowExecution:checkAndResume] Resuming polling for execution ${ongoingStatus.executionId}`);
+        executionIdRef.current = ongoingStatus.executionId;
+        // Update both popup and workflows store
+        startPopupExecution(wfId, ongoingStatus.executionId);
+        startWorkflowExecution(wfId, ongoingStatus.executionId);
+        startPollingRef.current(ongoingStatus.executionId);
+      } else if (!ongoingStatus.isRunning && ongoingStatus.result) {
+        // Execution completed while popup was closed - display results
+        console.log(`[useWorkflowExecution:checkAndResume] Displaying completed execution. Status=${ongoingStatus.result.status}, Error=${ongoingStatus.result.error}`);
+
+        // Also update workflows store to clear the "running" status
+        if (ongoingStatus.executionId) {
+          updateWorkflowExecution(ongoingStatus.executionId, {
+            status: ongoingStatus.result.status === 'success' ? 'success' : 'error',
+            finishedAt: new Date().toISOString(),
+          });
+        }
+
+        if (ongoingStatus.result.status === 'success') {
+          completePopupExecution(ongoingStatus.result.outputs || []);
+        } else {
+          failPopupExecution(ongoingStatus.result.error || 'Workflow execution failed');
+        }
+      } else {
+        console.log(`[useWorkflowExecution:checkAndResume] No previous execution or result to display`);
+      }
+    } catch (err) {
+      console.error('[useWorkflowExecution:checkAndResume] Error:', err);
+    }
+  }, []); // No dependencies - uses refs for stable references
+
+  /**
    * Load workflow analysis and configuration
    */
   const loadWorkflow = useCallback(async (id: string) => {
@@ -94,7 +233,7 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
 
       if (analysisResult.error) {
         console.error(`[useWorkflowExecution] Analysis error: ${analysisResult.error}`);
-        failExecution(analysisResult.error);
+        failPopupExecution(analysisResult.error);
         return;
       }
 
@@ -134,18 +273,22 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
         lastUpdated: new Date().toISOString(),
         inputs: mergedInputs,
         lastExecution: existingConfig?.lastExecution || null,
+        lastExecutionId: existingConfig?.lastExecutionId || null,
       };
 
       setPopupConfig(newConfig);
       setCurrentWorkflow(id);
+
+      // Check for ongoing/completed execution and resume if needed
+      await checkAndResumeExecution(id);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load workflow';
       console.error(`[useWorkflowExecution] Error loading workflow:`, err);
-      failExecution(message);
+      failPopupExecution(message);
     } finally {
       setPopupLoading(false);
     }
-  }, []);
+  }, []); // checkAndResumeExecution is stable (no deps), so loadWorkflow can be stable too
 
   /**
    * Update input value
@@ -178,13 +321,15 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
       });
 
       if (!response.success) {
-        failExecution(response.error || 'Failed to start execution');
+        failPopupExecution(response.error || 'Failed to start execution');
         return;
       }
 
       const executionId = response.executionId!;
       executionIdRef.current = executionId;
-      startExecution(workflowId, executionId);
+      // Update both popup and workflows store
+      startPopupExecution(workflowId, executionId);
+      startWorkflowExecution(workflowId, executionId);
 
       // Start polling for results
       startPolling(executionId);
@@ -192,88 +337,17 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
       // Set timeout (FR-004b)
       timeoutRef.current = setTimeout(() => {
         stopPolling();
-        failExecution('Workflow execution timed out after 5 minutes');
+        failPopupExecution('Workflow execution timed out after 5 minutes');
+        // Also update workflows store
+        if (executionIdRef.current) {
+          updateWorkflowExecution(executionIdRef.current, { status: 'error', finishedAt: new Date().toISOString() });
+        }
       }, DEFAULT_TIMEOUT);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to execute workflow';
-      failExecution(message);
+      failPopupExecution(message);
     }
-  }, [workflowId, inputs, canExecute]);
-
-  /**
-   * Start polling for execution status
-   */
-  const startPolling = useCallback((executionId: string) => {
-    let progress = 0;
-    let consecutiveErrors = 0;
-    const MAX_CONSECUTIVE_ERRORS = 5;
-
-    pollingRef.current = setInterval(async () => {
-      try {
-        const status = await window.electron.workflowPopup.status(executionId);
-
-        // Reset error counter on successful poll
-        consecutiveErrors = 0;
-
-        // Update progress indicator
-        progress = Math.min(progress + 5, 95);
-        updateExecutionProgress(status.progress ?? progress);
-
-        // Check for completion
-        if (status.status === 'success') {
-          console.log(`[useWorkflowExecution] Execution ${executionId} completed successfully`);
-          stopPolling();
-          completeExecution(status.result?.outputs || []);
-
-          // Save config with results
-          if (config && workflowId) {
-            await window.electron.workflowPopup.saveConfig({
-              ...config,
-              inputs,
-              lastExecution: status.result || {
-                executionId,
-                status: 'success',
-                startedAt: new Date().toISOString(),
-                completedAt: new Date().toISOString(),
-                durationMs: 0,
-                outputs: [],
-                error: null,
-              },
-              lastUpdated: new Date().toISOString(),
-            });
-          }
-        } else if (status.status === 'error') {
-          console.error(`[useWorkflowExecution] Execution ${executionId} failed:`, status.result?.error);
-          stopPolling();
-          failExecution(status.result?.error || 'Workflow execution failed');
-        }
-      } catch (err) {
-        consecutiveErrors++;
-        console.error(`[useWorkflowExecution] Polling error (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`, err);
-
-        // Stop polling after too many consecutive errors to prevent infinite loop
-        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-          console.error('[useWorkflowExecution] Too many consecutive polling errors, stopping');
-          stopPolling();
-          failExecution('Lost connection to execution status - please check n8n logs');
-        }
-      }
-    }, POLL_INTERVAL);
-  }, [config, inputs, workflowId]);
-
-  /**
-   * Stop polling
-   */
-  const stopPolling = useCallback(() => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-  }, []);
+  }, [workflowId, inputs, canExecute, startPolling, stopPolling]);
 
   /**
    * Cancel ongoing execution
@@ -284,6 +358,8 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
     if (executionIdRef.current) {
       try {
         await window.electron.workflowPopup.cancel(executionIdRef.current);
+        // Update workflows store
+        removeExecution(executionIdRef.current);
       } catch (err) {
         console.error('Cancel error:', err);
       }
@@ -329,13 +405,20 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
   }, [inputs]);
 
   /**
-   * Cleanup on unmount
+   * Cleanup on popup close
+   * Note: Only stops polling but does NOT cancel execution.
+   * Execution continues in the background and results will be shown when popup reopens.
    */
   const cleanup = useCallback(() => {
     stopPolling();
     setCurrentWorkflow(null);
-    resetExecutionState();
+    // Don't reset execution state - allow background execution to continue
+    // Results will be restored when popup reopens via checkAndResumeExecution
   }, [stopPolling]);
+
+  // Use ref for stopPolling to avoid dependency issues in useEffect
+  const stopPollingRef = useRef(stopPolling);
+  stopPollingRef.current = stopPolling;
 
   // Load workflow when ID changes
   useEffect(() => {
@@ -344,9 +427,9 @@ export function useWorkflowExecution(workflowId: string | null): UseWorkflowExec
     }
 
     return () => {
-      stopPolling();
+      stopPollingRef.current();
     };
-  }, [workflowId, loadWorkflow, stopPolling]);
+  }, [workflowId]); // loadWorkflow is stable (no deps), stopPolling accessed via ref
 
   return {
     isLoading,

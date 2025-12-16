@@ -19,6 +19,9 @@ import {
   deletePopupConfig,
   clearLastExecution,
   updateLastExecution,
+  setLastExecutionId,
+  getLastExecutionId,
+  clearLastExecutionId,
 } from '../stores/popup-config-store';
 import type {
   WorkflowPopupConfig,
@@ -150,6 +153,9 @@ export function registerWorkflowExecutionHandlers(
         startTime: Date.now(),
       });
 
+      // Store execution ID for popup resumption
+      setLastExecutionId(request.workflowId, result.executionId);
+
       // Start polling in background (don't await)
       pollAndCompleteExecution(
         executor,
@@ -160,6 +166,97 @@ export function registerWorkflowExecutionHandlers(
     }
 
     return result;
+  });
+
+  /**
+   * Check if a workflow has an ongoing execution
+   */
+  ipcMain.handle('workflow-popup:get-ongoing-execution', async (_event, workflowId: string) => {
+    console.log(`[IPC:get-ongoing-execution] Called for workflow ${workflowId}`);
+
+    // Check if there's an ongoing execution in memory
+    const ongoing = ongoingExecutions.get(workflowId);
+    console.log(`[IPC:get-ongoing-execution] ongoingExecutions.has(${workflowId}): ${!!ongoing}`);
+
+    if (ongoing) {
+      const executionId = getLastExecutionId(workflowId);
+      console.log(`[IPC:get-ongoing-execution] Returning isRunning=true, executionId=${executionId}`);
+      return {
+        isRunning: true,
+        executionId,
+      };
+    }
+
+    // Check if there's a stored execution ID that we should check status for
+    const lastExecutionId = getLastExecutionId(workflowId);
+    console.log(`[IPC:get-ongoing-execution] lastExecutionId from store: ${lastExecutionId}`);
+
+    // Also check the stored lastExecution result
+    const storedConfig = getPopupConfig(workflowId);
+    console.log(`[IPC:get-ongoing-execution] storedConfig.lastExecution: ${storedConfig?.lastExecution ? JSON.stringify({
+      executionId: storedConfig.lastExecution.executionId,
+      status: storedConfig.lastExecution.status,
+      error: storedConfig.lastExecution.error
+    }) : 'null'}`);
+
+    if (lastExecutionId) {
+      try {
+        // Check if this execution is still running
+        const status = await executor.getExecutionStatus(lastExecutionId);
+        console.log(`[IPC:get-ongoing-execution] executor.getExecutionStatus returned: status=${status.status}, hasResult=${!!status.result}`);
+
+        if (status.status === 'running' || status.status === 'waiting') {
+          console.log(`[IPC:get-ongoing-execution] Returning isRunning=true (still running)`);
+          return {
+            isRunning: true,
+            executionId: lastExecutionId,
+          };
+        }
+
+        // Execution completed - prefer the result from status, fall back to stored result
+        const result = status.result || storedConfig?.lastExecution;
+        console.log(`[IPC:get-ongoing-execution] Returning isRunning=false, result status=${result?.status}, error=${result?.error}`);
+        return {
+          isRunning: false,
+          executionId: lastExecutionId,
+          result: result,
+        };
+      } catch (error) {
+        console.log(`[IPC:get-ongoing-execution] Error getting status for execution ${lastExecutionId}:`, error);
+
+        // If we have a stored result, return it instead of clearing
+        if (storedConfig?.lastExecution) {
+          console.log(`[IPC:get-ongoing-execution] Returning stored lastExecution result`);
+          return {
+            isRunning: false,
+            executionId: lastExecutionId,
+            result: storedConfig.lastExecution,
+          };
+        }
+
+        clearLastExecutionId(workflowId);
+        return {
+          isRunning: false,
+          executionId: null,
+        };
+      }
+    }
+
+    // No lastExecutionId, but check if we have a stored result anyway
+    if (storedConfig?.lastExecution) {
+      console.log(`[IPC:get-ongoing-execution] No lastExecutionId but have stored lastExecution, returning it`);
+      return {
+        isRunning: false,
+        executionId: storedConfig.lastExecution.executionId,
+        result: storedConfig.lastExecution,
+      };
+    }
+
+    console.log(`[IPC:get-ongoing-execution] No execution found, returning default`);
+    return {
+      isRunning: false,
+      executionId: null,
+    };
   });
 
   /**
@@ -327,17 +424,55 @@ async function pollAndCompleteExecution(
   executionId: string,
   timeout?: number
 ): Promise<void> {
+  console.log(`[IPC:pollAndComplete] Starting background poll for workflow=${workflowId}, executionId=${executionId}`);
+
+  let finalStatus: 'success' | 'error' | 'timeout' = 'error';
+
   try {
     const result = await executor.pollExecution(executionId, timeout);
 
+    console.log(`[IPC:pollAndComplete] Poll completed. Result: status=${result.status}, error=${result.error}, outputs=${result.outputs?.length || 0}`);
+
+    finalStatus = result.status;
+
     // Store result in config
     updateLastExecution(workflowId, result);
+    console.log(`[IPC:pollAndComplete] Stored result via updateLastExecution for workflow=${workflowId}`);
 
-    console.log(`[IPC] Execution ${executionId} completed with status: ${result.status}`);
+    console.log(`[IPC:pollAndComplete] Execution ${executionId} completed with status: ${result.status}`);
   } catch (error) {
-    console.error('[IPC] Error polling execution:', error);
+    console.error(`[IPC:pollAndComplete] Error polling execution ${executionId}:`, error);
+
+    finalStatus = 'error';
+
+    // Store error result so popup can show it
+    const errorResult = {
+      executionId,
+      status: 'error' as const,
+      startedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      durationMs: 0,
+      outputs: [],
+      error: error instanceof Error ? error.message : 'Unknown polling error',
+    };
+    updateLastExecution(workflowId, errorResult);
+    console.log(`[IPC:pollAndComplete] Stored error result for workflow=${workflowId}`);
   } finally {
     // Clean up tracking
+    console.log(`[IPC:pollAndComplete] Cleaning up ongoingExecutions for workflow=${workflowId}`);
     ongoingExecutions.delete(workflowId);
+    // Note: We keep lastExecutionId so popup can show results when reopened
+
+    // Notify renderer that execution completed so it can update UI
+    const { BrowserWindow } = await import('electron');
+    const windows = BrowserWindow.getAllWindows();
+    for (const win of windows) {
+      win.webContents.send('workflow-execution:completed', {
+        workflowId,
+        executionId,
+        status: finalStatus,
+      });
+    }
+    console.log(`[IPC:pollAndComplete] Sent workflow-execution:completed event to renderer`);
   }
 }

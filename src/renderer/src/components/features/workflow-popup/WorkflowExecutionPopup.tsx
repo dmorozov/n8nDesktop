@@ -75,15 +75,15 @@ export function WorkflowExecutionPopup({
   const handleClose = useCallback(async () => {
     if (isExecuting) {
       const result = await window.electron.dialog.showMessage({
-        type: 'question',
+        type: 'info',
         title: 'Execution in Progress',
-        message: 'Workflow is still running. Do you want to close anyway?',
-        detail: 'The execution will continue in the background.',
-        buttons: ['Close', 'Cancel'],
+        message: 'Workflow is still running',
+        detail: 'The execution will continue in the background. You can reopen this popup to see the results when complete.',
+        buttons: ['Close Popup', 'Stay'],
       });
 
       if (result.response === 1) {
-        return; // User cancelled
+        return; // User wants to stay
       }
     }
 

@@ -91,11 +91,25 @@ export function updateLastExecution(
   executionResult: ExecutionResult
 ): void {
   try {
+    console.log(`[PopupConfigStore] updateLastExecution called for workflow=${workflowId}, status=${executionResult.status}, error=${executionResult.error}`);
+
     const config = getPopupConfig(workflowId);
     if (config) {
       setPopupConfig({
         ...config,
         lastExecution: executionResult,
+      });
+      console.log(`[PopupConfigStore] Updated existing config with lastExecution`);
+    } else {
+      // Create minimal config if none exists
+      console.log(`[PopupConfigStore] No existing config, creating new one with lastExecution`);
+      setPopupConfig({
+        workflowId,
+        workflowName: '',
+        lastUpdated: new Date().toISOString(),
+        inputs: {},
+        lastExecution: executionResult,
+        lastExecutionId: executionResult.executionId,
       });
     }
   } catch (error) {
@@ -118,6 +132,69 @@ export function clearLastExecution(workflowId: string): void {
     }
   } catch (error) {
     console.error('[PopupConfigStore] Error clearing last execution:', error);
+  }
+}
+
+/**
+ * Store the last triggered execution ID for a workflow
+ * @param workflowId - The n8n workflow ID
+ * @param executionId - The execution ID to store
+ */
+export function setLastExecutionId(workflowId: string, executionId: string): void {
+  try {
+    const config = getPopupConfig(workflowId);
+    if (config) {
+      setPopupConfig({
+        ...config,
+        lastExecutionId: executionId,
+      });
+    } else {
+      // Create minimal config if none exists
+      setPopupConfig({
+        workflowId,
+        workflowName: '',
+        lastUpdated: new Date().toISOString(),
+        inputs: {},
+        lastExecution: null,
+        lastExecutionId: executionId,
+      });
+    }
+    console.log(`[PopupConfigStore] Stored lastExecutionId ${executionId} for workflow ${workflowId}`);
+  } catch (error) {
+    console.error('[PopupConfigStore] Error storing last execution ID:', error);
+  }
+}
+
+/**
+ * Get the last triggered execution ID for a workflow
+ * @param workflowId - The n8n workflow ID
+ * @returns The last execution ID or null if not found
+ */
+export function getLastExecutionId(workflowId: string): string | null {
+  try {
+    const config = getPopupConfig(workflowId);
+    return config?.lastExecutionId || null;
+  } catch (error) {
+    console.error('[PopupConfigStore] Error getting last execution ID:', error);
+    return null;
+  }
+}
+
+/**
+ * Clear the last execution ID for a workflow (when execution completes)
+ * @param workflowId - The n8n workflow ID
+ */
+export function clearLastExecutionId(workflowId: string): void {
+  try {
+    const config = getPopupConfig(workflowId);
+    if (config) {
+      setPopupConfig({
+        ...config,
+        lastExecutionId: null,
+      });
+    }
+  } catch (error) {
+    console.error('[PopupConfigStore] Error clearing last execution ID:', error);
   }
 }
 

@@ -365,6 +365,8 @@ export interface WorkflowPopupConfig {
   lastUpdated: string;
   inputs: Record<string, WorkflowPopupInputFieldConfig>;
   lastExecution: WorkflowPopupExecutionResult | null;
+  /** ID of the last triggered execution (for resuming status polling) */
+  lastExecutionId: string | null;
 }
 
 export interface WorkflowPopupNodeInfo {
@@ -427,6 +429,18 @@ export interface WorkflowPopupFileSaveResult {
   filePath?: string;
 }
 
+export interface WorkflowPopupOngoingExecutionResponse {
+  isRunning: boolean;
+  executionId: string | null;
+  result?: WorkflowPopupExecutionResult;
+}
+
+export interface WorkflowPopupExecutionCompletedData {
+  workflowId: string;
+  executionId: string;
+  status: string;
+}
+
 export interface WorkflowPopupAPI {
   analyze: (workflowId: string) => Promise<WorkflowPopupAnalysisResult>;
   getConfig: (workflowId: string) => Promise<WorkflowPopupConfig | null>;
@@ -438,6 +452,8 @@ export interface WorkflowPopupAPI {
   selectFiles: (options: WorkflowPopupFileSelectOptions) => Promise<WorkflowPopupFileSelectResult>;
   saveFile: (options: WorkflowPopupFileSaveOptions) => Promise<WorkflowPopupFileSaveResult>;
   copyOutputFile: (sourcePath: string, destinationPath: string) => Promise<{ success: boolean; error?: string }>;
+  getOngoingExecution: (workflowId: string) => Promise<WorkflowPopupOngoingExecutionResponse>;
+  onExecutionCompleted: (callback: (data: WorkflowPopupExecutionCompletedData) => void) => () => void;
 }
 
 // API exposed to renderer
