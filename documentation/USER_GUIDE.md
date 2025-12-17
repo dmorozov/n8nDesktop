@@ -75,9 +75,9 @@ At the bottom of the sidebar, you'll see:
 │          │                                              │
 │ Sidebar  │           Main Content Area                  │
 │          │                                              │
-│ + New    │   Your workflows appear here as cards       │
+│ + New    │   Your workflows appear here as cards        │
 │          │                                              │
-│ Workflows│   [Workflow 1]  [Workflow 2]  [Workflow 3]  │
+│ Workflows│   [Workflow 1]  [Workflow 2]  [Workflow 3]   │
 │ Recent   │                                              │
 │ AI Svc   │                                              │
 │          │                                              │
@@ -156,7 +156,7 @@ When you click Run, you'll see a friendly popup with:
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│                   Document Summarizer                       │
+│                   Document Summarizer                      │
 ├──────────────────┬─────────────┬───────────────────────────┤
 │                  │             │                           │
 │   YOUR INPUT     │   STATUS    │      RESULTS              │
@@ -166,7 +166,7 @@ When you click Run, you'll see a friendly popup with:
 │ [Enter Text]     │             │                           │
 │                  │             │                           │
 ├──────────────────┴─────────────┴───────────────────────────┤
-│                    [Execute]  [Cancel]                      │
+│                    [Execute]  [Cancel]                     │
 └────────────────────────────────────────────────────────────┘
 ```
 
