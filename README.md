@@ -279,7 +279,14 @@ MIT License
 
 ## Contributing
 
-Contributions are welcome! Please read the technical documentation before submitting PRs.
+Contributions are welcome! Before submitting a pull request:
+
+1. Read the [Technical Architecture](./documentation/TECHNICAL_ARCHITECTURE.md) documentation
+2. Follow the existing code style and patterns
+3. Include tests for new functionality
+4. Update documentation if needed
+
+For detailed instructions on creating pull requests, see [GitHub's PR documentation](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request).
 
 ---
 
