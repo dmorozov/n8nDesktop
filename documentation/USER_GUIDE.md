@@ -103,9 +103,7 @@ At the bottom of the sidebar, you'll see:
 ### What is a Workflow?
 
 A workflow is a pre-configured set of steps that processes your input and produces a result. For example:
-- "Document Summarizer" - Takes a PDF and creates a summary
-- "AI Chat Assistant" - Lets you have a conversation with an AI
-- "Email Classifier" - Categorizes emails automatically
+TBD
 
 ### Viewing Your Workflows
 

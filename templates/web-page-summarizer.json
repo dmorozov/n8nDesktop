@@ -1,10 +1,10 @@
 {
-  "id": "scrape-web-page",
-  "name": "Scrapping Web page with AI Summarization",
+  "id": "web-page-summarizer",
+  "name": "Create a Summary for Web Page",
   "description": "Scrape a web page and generate AI summary using Map-Reduce for large documents",
   "icon": "file",
   "workflow": {
-    "name": "Scrapping Web page with AI Summarization",
+    "name": "Create a Summary for Web Page",
     "nodes": [
       {
         "parameters": {},

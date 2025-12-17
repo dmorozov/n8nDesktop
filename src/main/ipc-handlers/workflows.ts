@@ -394,7 +394,7 @@ function replacePlaceholders(content: string, values: Record<string, string>): s
 // Built-in templates (fallback if template files not found)
 function getBuiltInTemplates(): WorkflowTemplate[] {
   return [
-    {
+    /*{
       id: 'ai-chat',
       name: 'AI Chat Assistant',
       description: 'Build a chatbot with OpenAI or Anthropic',
@@ -413,51 +413,7 @@ function getBuiltInTemplates(): WorkflowTemplate[] {
         connections: {},
         settings: {},
       },
-    },
-    {
-      id: 'automation',
-      name: 'General Automation',
-      description: 'Connect apps and automate tasks',
-      icon: 'cog',
-      workflow: {
-        name: 'General Automation',
-        nodes: [
-          {
-            name: 'Schedule Trigger',
-            type: 'n8n-nodes-base.scheduleTrigger',
-            typeVersion: 1.2,
-            position: [250, 300],
-            parameters: {
-              rule: {
-                interval: [{ field: 'hours', hoursInterval: 1 }],
-              },
-            },
-          },
-        ],
-        connections: {},
-        settings: {},
-      },
-    },
-    {
-      id: 'pdf-processing',
-      name: 'PDF Processing',
-      description: 'Extract and transform document data',
-      icon: 'file',
-      workflow: {
-        name: 'PDF Processing',
-        nodes: [
-          {
-            name: 'When clicking "Test workflow"',
-            type: 'n8n-nodes-base.manualTrigger',
-            typeVersion: 1,
-            position: [250, 300],
-            parameters: {},
-          },
-        ],
-        connections: {},
-        settings: {},
-      },
-    },
+    }*/
   ];
 }
 

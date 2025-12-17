@@ -1,31 +1,12 @@
 {
-  "id": "ai-document-summarizer",
-  "name": "AI-Powered Document Summarizer & Notifier",
-  "description": "Build a chatbot with OpenAI or Anthropic",
-  "icon": "bot",
+  "id": "automation",
+  "name": "Email Classifier",
+  "description": "Connect email box and classify emails",
+  "icon": "cog",
   "workflow": {
-    "meta": {
-      "instanceId": "af9fe5bb0163dc4cbb85dd6fb4c45fe63eac1327996aeecd696d8f7aed2d776b",
-      "templateCredsSetupCompleted": true
-    },
-    "name": "AI-Powered Document Summarizer & Notifier",
-    "tags": [
-      {
-        "id": "oXLqGOyVDwolvp9S",
-        "name": "document summarizer",
-        "createdAt": "2025-09-17T10:08:20.905Z",
-        "updatedAt": "2025-09-17T10:08:20.905Z"
-      },
-      {
-        "id": "qtuQF3Lc141mfYiM",
-        "name": "n8n template",
-        "createdAt": "2025-09-11T07:44:43.900Z",
-        "updatedAt": "2025-09-17T10:07:33.999Z"
-      }
-    ],
+    "name": "Email Classifier",
     "nodes": [
       {
-        "id": "77c58599-2aea-4ba4-8132-4f82fdcf8bd3",
         "name": "OpenAI Chat Model",
         "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
         "position": [
@@ -49,7 +30,6 @@
         "typeVersion": 1.2
       },
       {
-        "id": "f645be4e-6234-4984-9e4a-1552e847d927",
         "name": "File Created",
         "type": "n8n-nodes-base.googleDriveTrigger",
         "position": [
@@ -81,7 +61,6 @@
         "typeVersion": 1
       },
       {
-        "id": "e97c0523-5ba4-45d3-a993-b11320f99e26",
         "name": "Get a document",
         "type": "n8n-nodes-base.googleDocs",
         "position": [
@@ -101,7 +80,6 @@
         "typeVersion": 2
       },
       {
-        "id": "cd20e8af-3fba-4204-a953-ab8d07c25184",
         "name": "Check Document Type",
         "type": "n8n-nodes-base.if",
         "position": [
@@ -120,7 +98,6 @@
             "combinator": "and",
             "conditions": [
               {
-                "id": "4e823422-08d2-4b98-a537-058c84010f1c",
                 "operator": {
                   "type": "string",
                   "operation": "contains"
@@ -134,7 +111,6 @@
         "typeVersion": 2.2
       },
       {
-        "id": "db6038cb-5a52-420d-abd5-4655e2f383f0",
         "name": "Set Field",
         "type": "n8n-nodes-base.set",
         "position": [
@@ -146,7 +122,6 @@
           "assignments": {
             "assignments": [
               {
-                "id": "2a756e70-4b34-4595-a1cb-a8e6dd715f07",
                 "name": "text",
                 "type": "string",
                 "value": "={{ $json.content }}"
@@ -157,7 +132,6 @@
         "typeVersion": 3.4
       },
       {
-        "id": "bf9bf0f4-1315-4816-91ff-9b53c6bf9423",
         "name": "Convert to Text",
         "type": "n8n-nodes-base.extractFromFile",
         "position": [
@@ -171,7 +145,6 @@
         "typeVersion": 1
       },
       {
-        "id": "f34b4745-ebd6-430b-88c6-9c34d0e4b03d",
         "name": "Download PDF",
         "type": "n8n-nodes-base.googleDrive",
         "position": [

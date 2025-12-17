@@ -1,10 +1,10 @@
 {
-  "id": "pdf-processing",
-  "name": "PDF Processing with AI Summary",
+  "id": "document-summarizer",
+  "name": "Create a Summary for document(s)",
   "description": "Extract document text with Docling OCR and generate AI summary using Map-Reduce for large documents",
   "icon": "file",
   "workflow": {
-    "name": "PDF Processing with AI Summary",
+    "name": "Create a Summary for document(s)",
     "nodes": [
       {
         "parameters": {},

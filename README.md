@@ -27,6 +27,8 @@ The result is a bridge between technical capability and everyday usability. Some
 
 ### For End Users (Non-Technical)
 
+![n8n AI Runner - Main Interface](./documentation/ui.png)
+
 - **Simple Workflow Execution**: Click "Run", select your file, see results
 - **No Setup Required**: Install like any desktop application
 - **Privacy First**: All processing happens locally on your computer
@@ -196,12 +198,9 @@ The custom nodes are:
 
 ## Workflow Templates
 
-Pre-built templates are available in the `templates/` folder:
+The application has some Pre-built templates are available in the `templates/` folder:
 
-- **AI Chat Assistant** - Basic chatbot with AI Agent
-- **PDF Processing with AI Summary** - Document extraction and summarization
-- **Web Scraper** - Web page content extraction
-- **Automation** - General automation template
+TBD
 
 Templates use placeholders that are replaced at runtime:
 - `{{DOCLING_API_URL}}` - Docling API endpoint
