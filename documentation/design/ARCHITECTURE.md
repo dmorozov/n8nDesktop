@@ -164,69 +164,69 @@ n8nDesktop/
 ## 4. Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           ELECTRON APPLICATION                          │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
+┌────────────────────────────────────────────────────────────────────────┐
+│                           ELECTRON APPLICATION                         │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                        │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                        MAIN PROCESS                              │   │
-│  │                                                                  │   │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │   │
-│  │  │ ConfigManager│  │  N8nManager  │  │   N8nAuthManager     │  │   │
-│  │  │              │  │              │  │                      │  │   │
-│  │  │ electron-    │  │ Child        │  │ • Owner Setup        │  │   │
-│  │  │ store        │  │ Process      │  │ • Login/Session      │  │   │
-│  │  │              │  │ Management   │  │ • Cookie Injection   │  │   │
-│  │  └──────────────┘  └──────────────┘  └──────────────────────┘  │   │
-│  │                                                                  │   │
+│  │                        MAIN PROCESS                             │   │
+│  │                                                                 │   │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐   │   │
+│  │  │ ConfigManager│  │  N8nManager  │  │   N8nAuthManager     │   │   │
+│  │  │              │  │              │  │                      │   │   │
+│  │  │ electron-    │  │ Child        │  │ • Owner Setup        │   │   │
+│  │  │ store        │  │ Process      │  │ • Login/Session      │   │   │
+│  │  │              │  │ Management   │  │ • Cookie Injection   │   │   │
+│  │  └──────────────┘  └──────────────┘  └──────────────────────┘   │   │
+│  │                                                                 │   │
 │  │  ┌──────────────────────────────────────────────────────────┐   │   │
-│  │  │                    IPC Handlers                           │   │   │
+│  │  │                    IPC Handlers                          │   │   │
 │  │  │  n8n:* | config:* | workflows:* | editor:* | storage:*   │   │   │
 │  │  └──────────────────────────────────────────────────────────┘   │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
-│                                    │                                    │
-│                              IPC Bridge                                 │
-│                                    │                                    │
+│                                    │                                   │
+│                              IPC Bridge                                │
+│                                    │                                   │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                      PRELOAD SCRIPT                              │   │
-│  │            contextBridge.exposeInMainWorld('electron', API)      │   │
+│  │                      PRELOAD SCRIPT                             │   │
+│  │            contextBridge.exposeInMainWorld('electron', API)     │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
-│                                    │                                    │
+│                                    │                                   │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                     RENDERER PROCESS                             │   │
-│  │                                                                  │   │
+│  │                     RENDERER PROCESS                            │   │
+│  │                                                                 │   │
 │  │  ┌────────────────────────────────────────────────────────┐     │   │
-│  │  │                     React App                           │     │   │
-│  │  │  ┌──────────┐  ┌──────────┐  ┌──────────────────────┐ │     │   │
-│  │  │  │ Pages    │  │Components│  │     Nanostores       │ │     │   │
-│  │  │  │          │  │          │  │                      │ │     │   │
-│  │  │  │ Home     │  │ Layout   │  │ $n8nStatus           │ │     │   │
-│  │  │  │ Recent   │  │ Features │  │ $workflows           │ │     │   │
-│  │  │  │ AI Svc   │  │ UI       │  │ $settings            │ │     │   │
-│  │  │  │ Welcome  │  │          │  │ $editorVisible       │ │     │   │
-│  │  │  └──────────┘  └──────────┘  └──────────────────────┘ │     │   │
+│  │  │                     React App                          │     │   │
+│  │  │  ┌──────────┐  ┌──────────┐  ┌──────────────────────┐  │     │   │
+│  │  │  │ Pages    │  │Components│  │     Nanostores       │  │     │   │
+│  │  │  │          │  │          │  │                      │  │     │   │
+│  │  │  │ Home     │  │ Layout   │  │ $n8nStatus           │  │     │   │
+│  │  │  │ Recent   │  │ Features │  │ $workflows           │  │     │   │
+│  │  │  │ AI Svc   │  │ UI       │  │ $settings            │  │     │   │
+│  │  │  │ Welcome  │  │          │  │ $editorVisible       │  │     │   │
+│  │  │  └──────────┘  └──────────┘  └──────────────────────┘  │     │   │
 │  │  └────────────────────────────────────────────────────────┘     │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
-│                                                                         │
+│                                                                        │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                      BROWSER VIEW                                │   │
-│  │                   (n8n Editor - Embedded)                        │   │
-│  │         Positioned with 64px offset for minimized sidebar        │   │
+│  │                      BROWSER VIEW                               │   │
+│  │                   (n8n Editor - Embedded)                       │   │
+│  │         Positioned with 64px offset for minimized sidebar       │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+│                                                                        │
+└────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         N8N SERVER (Child Process)                      │
-│                                                                         │
-│  • Spawned via: bundled n8n binary from node_modules                    │
-│  • Port: Configurable (default 5678)                                    │
+┌────────────────────────────────────────────────────────────────────────┐
+│                         N8N SERVER (Child Process)                     │
+│                                                                        │
+│  • Spawned via: bundled n8n binary from node_modules                   │
+│  • Port: Configurable (default 5678)                                   │
 │  • Database: SQLite (in user data folder)                              │
 │  • REST API: /rest/* endpoints for internal communication              │
 │  • Health Check: /healthz endpoint every 5 seconds                     │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+│                                                                        │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
