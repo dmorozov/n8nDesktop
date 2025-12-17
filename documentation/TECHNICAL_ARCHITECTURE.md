@@ -27,21 +27,21 @@ n8n AI Runner follows a multi-process architecture pattern common in Electron ap
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     ELECTRON APPLICATION                         │
+│                     ELECTRON APPLICATION                        │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────┐ │
+│  ┌─────────────────┐    ┌──────────────────┐    ┌─────────────┐ │
 │  │   Main Process  │    │ Renderer Process │    │ BrowserView │ │
 │  │   (Node.js)     │◄──►│    (React UI)    │    │ (n8n Editor)│ │
-│  └────────┬────────┘    └─────────────────┘    └─────────────┘ │
+│  └────────┬────────┘    └──────────────────┘    └─────────────┘ │
 │           │                                                     │
 │           │ Child Processes                                     │
 │           │                                                     │
-│  ┌────────▼────────┐    ┌─────────────────┐                    │
-│  │   n8n Server    │    │ Docling Service │                    │
-│  │  (Node.js)      │    │   (Python)      │                    │
-│  │  Port: 5678     │    │  Port: 8765     │                    │
-│  └─────────────────┘    └─────────────────┘                    │
+│  ┌────────▼────────┐    ┌─────────────────┐                     │
+│  │   n8n Server    │    │ Docling Service │                     │
+│  │  (Node.js)      │    │   (Python)      │                     │
+│  │  Port: 5678     │    │  Port: 8765     │                     │
+│  └─────────────────┘    └─────────────────┘                     │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -395,7 +395,7 @@ The popup system provides a simplified interface for non-technical users.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    WorkflowExecutionPopup                        │
+│                    WorkflowExecutionPopup                       │
 ├──────────────────┬─────────────────────┬────────────────────────┤
 │                  │                     │                        │
 │   InputPanel     │  CenterIndicator    │    OutputPanel         │
