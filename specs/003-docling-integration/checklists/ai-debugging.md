@@ -305,7 +305,7 @@ For AI self-verification to be considered complete:
 
 ## References
 
-- [AI Debugging Design Document](../../../design/AI_DEBUGGING.md)
+- [AI Debugging Design Document](../../../documentation/design/AI_DEBUGGING.md)
 - [Playwright MCP Server](https://github.com/microsoft/playwright-mcp)
 - [OpenAPI Contract](../contracts/openapi.yaml)
 - [Data Model](../data-model.md)

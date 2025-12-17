@@ -140,7 +140,7 @@ Since n8n runs as a child process of Electron, we can also use:
 
 The HTTP approach is simpler and aligns with existing architecture patterns (see IPC_RECOMMENDATIONS.md).
 
-**Source**: [n8n IPC Recommendations](design/IPC_RECOMMENDATIONS.md)
+**Source**: [n8n IPC Recommendations](../../documentation/design/IPC_RECOMMENDATIONS.md)
 
 ---
 

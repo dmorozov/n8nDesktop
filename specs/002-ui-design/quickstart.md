@@ -66,7 +66,8 @@ n8nDesktop/
 │           ├── lib/             # Utilities
 │           └── styles/          # CSS
 ├── specs/                       # Feature specifications
-├── design/                      # UI design mockups
+├── documentation/               # Documentation
+│   └── design/                  # UI design mockups
 ├── resources/                   # App icons and assets
 ├── forge.config.ts              # Electron Forge config
 ├── vite.main.config.ts

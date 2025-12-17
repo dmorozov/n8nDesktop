@@ -144,7 +144,8 @@ n8nDesktop/
 │   └── e2e/                       # End-to-end tests
 │
 ├── specs/                         # Feature specifications
-├── design/                        # UI design screenshots
+├── documentation/                 # Documentation
+│   └── design/                    # UI design screenshots
 │
 ├── forge.config.mts               # Electron Forge configuration
 ├── vite.main.config.mts           # Vite config for main process
