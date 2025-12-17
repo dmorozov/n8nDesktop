@@ -290,4 +290,15 @@ For detailed instructions on creating pull requests, see [GitHub's PR documentat
 
 ---
 
+## Disclaimer
+
+Approximately 90% of the code for this application was generated with the assistance of AI-powered development tools:
+
+- **[Claude Code](https://claude.ai/code)** - Anthropic's AI coding assistant for autonomous software development
+- **[SpecKit](https://github.com/github/spec-kit)** - GitHub's spec-driven development framework for AI-assisted implementation
+
+These tools were used for code generation, architecture design, documentation, and implementation planning. All generated code was reviewed and tested before integration.
+
+---
+
 *Built with care to bridge the gap between powerful AI tools and everyday users.*
